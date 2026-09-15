@@ -53,22 +53,71 @@ app.add_middleware(
 telegram_bot_instance.start()
 ads_sync_instance.start()
 
-# Self-ping keepalive: prevent Render free tier from sleeping
-# Pings own /api/health every 10 minutes so bot stays alive 24/7
-import threading, time, requests as _req
-def _keepalive():
-    time.sleep(30)  # wait for server to be fully ready
-    own_url = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8055")
-    print(f"[Keepalive] Starting self-ping every 10 min → {own_url}", flush=True)
+# ─── PRODUCTION KEEPALIVE + AUTO DB BACKUP ───────────────────────────────────
+import threading, time, base64, requests as _req
+
+RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8055")
+GH_TOKEN   = os.environ.get("GH_TOKEN", "")
+GH_REPO    = os.environ.get("GH_REPO", "hetzelliedberg-oss/jeans-finance-os")
+DB_PATH    = os.path.join(BASE_DIR, "data", "finance_hub.db")
+
+def _keepalive_loop():
+    """Ping own /api/health every 10 min → Render free tier stays awake 24/7"""
+    time.sleep(30)
+    print(f"[Keepalive] Started → pinging {RENDER_URL} every 10 min", flush=True)
     while True:
         try:
-            _req.get(f"{own_url}/api/health", timeout=10)
-            print(f"[Keepalive] Ping OK {datetime.now().strftime('%H:%M')}", flush=True)
+            _req.get(f"{RENDER_URL}/api/health", timeout=15)
+            print(f"[Keepalive] ✅ {datetime.now().strftime('%H:%M')}", flush=True)
         except Exception as e:
-            print(f"[Keepalive] Ping failed: {e}", flush=True)
-        time.sleep(600)  # 10 minutes
+            print(f"[Keepalive] ⚠ {e}", flush=True)
+        time.sleep(600)
 
-threading.Thread(target=_keepalive, daemon=True).start()
+def _backup_db_to_github():
+    """Push DB binary to GitHub every night at 02:00 so data survives Render restarts"""
+    while True:
+        now = datetime.now()
+        # Sleep until next 02:00
+        next_2am = now.replace(hour=2, minute=0, second=0, microsecond=0)
+        if now >= next_2am:
+            next_2am = next_2am.replace(day=next_2am.day + 1)
+        wait_sec = (next_2am - now).total_seconds()
+        print(f"[DB Backup] Next backup at 02:00 (in {wait_sec/3600:.1f}h)", flush=True)
+        time.sleep(wait_sec)
+        
+        if not GH_TOKEN:
+            print("[DB Backup] No GH_TOKEN set, skipping", flush=True)
+            continue
+        try:
+            with open(DB_PATH, "rb") as f:
+                content = base64.b64encode(f.read()).decode()
+            
+            api = f"https://api.github.com/repos/{GH_REPO}/contents/data/finance_hub.db"
+            headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+            
+            # Get current SHA
+            r = _req.get(api, headers=headers, timeout=15)
+            sha = r.json().get("sha", "")
+            
+            payload = {
+                "message": f"[auto] DB backup {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                "content": content,
+                "branch": "main"
+            }
+            if sha:
+                payload["sha"] = sha
+            
+            r2 = _req.put(api, headers=headers, json=payload, timeout=30)
+            if r2.status_code in (200, 201):
+                print(f"[DB Backup] ✅ Backed up to GitHub at {datetime.now().strftime('%H:%M')}", flush=True)
+            else:
+                print(f"[DB Backup] ⚠ GitHub API {r2.status_code}: {r2.text[:100]}", flush=True)
+        except Exception as e:
+            print(f"[DB Backup] ⚠ {e}", flush=True)
+
+threading.Thread(target=_keepalive_loop, daemon=True, name="keepalive").start()
+threading.Thread(target=_backup_db_to_github, daemon=True, name="db-backup").start()
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 # Pydantic models
