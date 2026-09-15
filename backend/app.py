@@ -53,6 +53,23 @@ app.add_middleware(
 telegram_bot_instance.start()
 ads_sync_instance.start()
 
+# Self-ping keepalive: prevent Render free tier from sleeping
+# Pings own /api/health every 10 minutes so bot stays alive 24/7
+import threading, time, requests as _req
+def _keepalive():
+    time.sleep(30)  # wait for server to be fully ready
+    own_url = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8055")
+    print(f"[Keepalive] Starting self-ping every 10 min → {own_url}", flush=True)
+    while True:
+        try:
+            _req.get(f"{own_url}/api/health", timeout=10)
+            print(f"[Keepalive] Ping OK {datetime.now().strftime('%H:%M')}", flush=True)
+        except Exception as e:
+            print(f"[Keepalive] Ping failed: {e}", flush=True)
+        time.sleep(600)  # 10 minutes
+
+threading.Thread(target=_keepalive, daemon=True).start()
+
 
 # Pydantic models
 class ScanTextRequest(BaseModel):
