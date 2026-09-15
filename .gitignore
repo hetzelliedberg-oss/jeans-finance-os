@@ -12,8 +12,8 @@ build/
 uvicorn_stderr.log
 uvicorn_stdout.log
 
-# Local DB (จะ deploy แยก)
-data/finance_hub.db
+# Local DB — included in git for cloud seeding
+# data/finance_hub.db
 
 # OS
 .DS_Store
