@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+uvicorn_stderr.log
+uvicorn_stdout.log
+
+# Local DB (จะ deploy แยก)
+data/finance_hub.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets (ถ้ามี .env)
+.env

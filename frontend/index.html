@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jeans Around - Finance OS & Telegram Profit Analyzer</title>
+  
+  <!-- Tailwind CSS & Fonts -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              900: '#312e81'
+            }
+          },
+          fontFamily: {
+            sans: ['Prompt', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body { font-family: 'Prompt', sans-serif; }
+    .glass { background: rgba(17, 24, 39, 0.85); backdrop-filter: blur(12px); }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <i data-lucide="trending-up" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            Jeans Around <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-medium border border-indigo-500/30">Finance OS</span>
+          </h1>
+          <p class="text-xs text-slate-400">ระบบงบกำไรขาดทุน & สรุปออเดอร์ Telegram อัตโนมัติ</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="flex items-center space-x-2">
+        <button onclick="openScanModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition shadow-sm">
+          <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+          <span>สแกนแชท</span>
+        </button>
+        <button onclick="openStorefrontModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition shadow-sm">
+          <i data-lucide="store" class="w-4 h-4"></i>
+          <span>กรอกยอด KKC</span>
+        </button>
+        <button onclick="openOneDriveModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition shadow-sm">
+          <i data-lucide="link" class="w-4 h-4"></i>
+          <span>ดึง OneDrive Link</span>
+        </button>
+        <button onclick="openTelegramModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition shadow-sm">
+          <i data-lucide="send" class="w-4 h-4"></i>
+          <span>เชื่อม Telegram</span>
+        </button>
+        <button onclick="syncFbAdsModal()" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="ซิงค์ Facebook Ads">
+          <i data-lucide="refresh-cw" class="w-4 h-4 text-blue-400"></i>
+        </button>
+        <button onclick="switchTab('settings')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition" title="ตั้งค่าระบบ">
+          <i data-lucide="settings" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SUBHEADER: FILTERS & NAVIGATION TABS -->
+  <div class="bg-slate-900 border-b border-slate-800/80 sticky top-16 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- NAVIGATION TABS -->
+      <nav class="flex space-x-1 sm:space-x-1.5 overflow-x-auto pb-1 sm:pb-0" id="mainTabs">
+        <button onclick="switchTab('pnl')" id="tab-btn-pnl" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+          <span>งบกำไรขาดทุน (P&L)</span>
+        </button>
+        <button onclick="switchTab('admins')" id="tab-btn-admins" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>แอดมิน & ค่าคอม</span>
+        </button>
+        <button onclick="switchTab('skus')" id="tab-btn-skus" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i data-lucide="package" class="w-4 h-4"></i>
+          <span>สินค้า & ไซส์</span>
+        </button>
+        <button onclick="switchTab('orders')" id="tab-btn-orders" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i data-lucide="receipt" class="w-4 h-4"></i>
+          <span>รายการออเดอร์</span>
+        </button>
+        <button onclick="switchTab('costs')" id="tab-btn-costs" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i data-lucide="tags" class="w-4 h-4"></i>
+          <span>จัดการต้นทุน (70+ SKU)</span>
+        </button>
+        <button onclick="switchTab('audit')" id="tab-btn-audit" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+          <span>ตรวจสอบยอด (3-Way Audit)</span>
+        </button>
+      </nav>
+
+      <!-- CHANNEL SELECTOR & DATE CONTROLS -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <!-- Channel Selector (Strict Separation) -->
+        <div class="inline-flex rounded-lg bg-slate-950 p-0.5 border border-slate-800 text-xs shadow-inner">
+          <button onclick="setChannel('online')" id="ch-online" class="px-3 py-1 rounded-md font-semibold text-white bg-indigo-600 transition flex items-center gap-1">
+            <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+            <span>ออนไลน์ ออฟฟิต</span>
+          </button>
+          <button onclick="setChannel('kkc')" id="ch-kkc" class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1">
+            <i data-lucide="store" class="w-3.5 h-3.5"></i>
+            <span>หน้าร้านเซนทรัล KKC</span>
+          </button>
+          <button onclick="setChannel('consolidated')" id="ch-consolidated" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">
+            <span>งบรวมทั้งบริษัท</span>
+          </button>
+        </div>
+
+        <!-- Date Presets with Unique IDs -->
+        <div class="flex items-center gap-1 bg-slate-950 px-1.5 py-1 rounded-lg border border-slate-800 text-xs">
+          <button onclick="setDatePreset('today')" id="preset-today" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">วันนี้</button>
+          <button onclick="setDatePreset('yesterday')" id="preset-yesterday" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">เมื่อวาน</button>
+          <button onclick="setDatePreset('7d')" id="preset-7d" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">7 วัน</button>
+          <button onclick="setDatePreset('sep')" id="preset-sep" class="preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition">ก.ย. 26</button>
+          <button onclick="setDatePreset('aug')" id="preset-aug" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">ส.ค. 26</button>
+        </div>
+
+        <!-- Date Range Inputs with onchange -->
+        <div class="flex items-center gap-1.5 text-xs text-slate-300">
+          <input type="date" id="inputStartDate" value="" onchange="handleDateChange()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 outline-none focus:border-indigo-500">
+          <span class="text-slate-500">-</span>
+          <input type="date" id="inputEndDate" value="" onchange="handleDateChange()" class="bg-slate-950 border border-slate-800 rounded px-2 py-1 text-slate-200 outline-none focus:border-indigo-500">
+          <button onclick="loadCurrentReport()" class="p-1.5 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded border border-indigo-500/40 transition" title="โหลดข้อมูล">
+            <i data-lucide="search" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SINGLE-DAY QUICK SELECTOR BAR -->
+  <div class="bg-slate-900/70 border-b border-slate-800/60 py-2">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2 overflow-x-auto py-0.5">
+        <span class="text-slate-400 flex items-center gap-1 font-medium whitespace-nowrap">
+          <i data-lucide="calendar" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>เลือกวันเดี่ยว:</span>
+        </span>
+        <div class="flex items-center gap-1" id="singleDayChips">
+          <!-- Auto-generated by JS -->
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <div id="activePeriodBadge" class="px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-medium flex items-center gap-1.5 text-[11px]">
+          <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
+          <span id="activePeriodText">กำลังโหลด...</span>
+        </div>
+        <button onclick="setDatePreset('sep')" class="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium">ดูทั้งเดือน ก.ย.</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT CONTAINER -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+    <!-- TAB 1: P&L FINANCIAL STATEMENT -->
+    <div id="tab-content-pnl" class="space-y-6">
+      
+      <!-- 4 EXECUTIVE KPI CARDS -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Sales Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+            <span>ยอดขายรวม (Gross Revenue)</span>
+            <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+              <i data-lucide="dollar-sign" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-white tracking-tight" id="kpiSales">฿0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+            <span id="kpiOrdersCount">0 ออเดอร์</span>
+            <span id="kpiPiecesCount" class="text-blue-400 font-medium">0 ตัว</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-cyan-500"></div>
+        </div>
+
+        <!-- COGS Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+            <span>ต้นทุนสินค้า (COGS)</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <i data-lucide="shopping-bag" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-amber-400 tracking-tight" id="kpiCogs">฿0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+            <span>สัดส่วนต้นทุนสินค้า:</span>
+            <span id="kpiCogsPct" class="text-amber-400 font-semibold font-mono">0.00%</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-600 to-yellow-500"></div>
+        </div>
+
+        <!-- Expenses Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+            <span>รวมค่าใช้จ่ายทั้งหมด (Expenses)</span>
+            <div class="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+              <i data-lucide="receipt" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-bold text-rose-400 tracking-tight" id="kpiExpenses">฿0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs text-slate-400">
+            <span>ค่าแอด + ค่าคน + คอม + เช่า:</span>
+            <span id="kpiExpensesPct" class="text-rose-400 font-semibold font-mono">0.00%</span>
+          </div>
+          <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-600 to-pink-500"></div>
+        </div>
+
+        <!-- Net Profit Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 relative overflow-hidden shadow-sm">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-medium mb-1">
+            <span>กำไรสุทธิ (Net Profit)</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <i data-lucide="pie-chart" class="w-4 h-4"></i>
+            </div>
+          </div>
+          <div class="text-2xl font-bold tracking-tight text-white" id="kpiNetProfit">฿0.00</div>
+          <div class="mt-2 flex items-center justify-between text-xs">
+            <span class="text-slate-400">Net Profit Margin:</span>
+            <span id="kpiNetMargin" class="font-bold font-mono px-2 py-0.5 rounded text-xs">0.00%</span>
+          </div>
+          <div id="netProfitBar" class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-600 to-teal-400"></div>
+        </div>
+      </div>
+
+      <!-- MAIN P&L STATEMENT TABLE -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg">
+        <div class="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/60">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="file-spreadsheet" class="w-5 h-5 text-indigo-400"></i>
+              <span>งบกำไรขาดทุนละเอียด (Profit & Loss Statement)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5" id="pnlPeriodSubtitle">ช่วงวันที่ 2026-09-01 ถึง 2026-09-12 (12 วัน)</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>คำนวณสัดส่วน % เทียบกับยอดขายจริงทุกบรรทัด</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 bg-slate-950/60 text-slate-400 uppercase tracking-wider text-[11px] font-semibold">
+                <th class="py-3.5 px-6">รายการบัญชี / โครงสร้างงบการเงิน</th>
+                <th class="py-3.5 px-6 text-right w-44">จำนวนเงิน (บาท)</th>
+                <th class="py-3.5 px-6 text-right w-36">สัดส่วนร้อยละ (%)</th>
+                <th class="py-3.5 px-6 text-center w-40 hidden md:table-cell">แถบสัดส่วน (% Bar)</th>
+              </tr>
+            </thead>
+            <tbody id="pnlTableBody" class="divide-y divide-slate-800/60">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DAILY TREND CHART -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+            <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+            <span>แนวโน้มยอดขายและกำไรขั้นต้นรายวัน (Daily Revenue & Gross Profit)</span>
+          </h3>
+          <span class="text-xs text-slate-400">บาท (THB)</span>
+        </div>
+        <div class="h-64 w-full">
+          <canvas id="trendChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB 2: ADMINS & COMMISSION -->
+    <div id="tab-content-admins" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="award" class="w-5 h-5 text-amber-400"></i>
+              <span>สรุปยอดขาย & ค่าคอมมิชชั่นรายแอดมิน (Admin Performance & Commission)</span>
+            </h2>
+            <p class="text-xs text-indigo-300 mt-1 font-medium" id="adminsPeriodSubtitle">
+              กำลังโหลดข้อมูลแอดมิน...
+            </p>
+          </div>
+          <span class="text-xs px-3 py-1 bg-amber-500/10 text-amber-400 rounded-full border border-amber-500/20 font-medium">
+            คอมมิชชั่น 10 บ./ตัว
+          </span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                <th class="py-3 px-4">ลำดับ</th>
+                <th class="py-3 px-4">ชื่อแอดมิน</th>
+                <th class="py-3 px-4 text-center">จำนวนออเดอร์</th>
+                <th class="py-3 px-4 text-center">จำนวนตัวที่ขายได้</th>
+                <th class="py-3 px-4 text-right">ยอดขายรวม (บาท)</th>
+                <th class="py-3 px-4 text-right">ส่วนแบ่งยอดขาย (%)</th>
+                <th class="py-3 px-4 text-right font-bold text-amber-400">ค่าคอมมิชชั่น (บาท)</th>
+              </tr>
+            </thead>
+            <tbody id="adminsTableBody" class="divide-y divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: SKU & SIZE ANALYSIS -->
+    <div id="tab-content-skus" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="layers" class="w-5 h-5 text-indigo-400"></i>
+              <span>สถิติยอดขายแยกตามรหัสรุ่นสินค้า (SKU) และไซส์</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">แจกแจงจำนวนตัว, ไซส์ที่ขายดี, ต้นทุนรวม และกำไรขั้นต้นรายรุ่น</p>
+          </div>
+          <div class="w-64">
+            <input type="text" id="skuSearchInput" oninput="filterSkuTable()" placeholder="ค้นหารหัสรุ่น SKU (เช่น XRP67)..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                <th class="py-3 px-4">รหัสรุ่น (SKU)</th>
+                <th class="py-3 px-4 text-center">จำนวนตัวที่ขาย</th>
+                <th class="py-3 px-4">แยกตามไซส์ (Size Breakdown)</th>
+                <th class="py-3 px-4 text-right">ต้นทุนต่อตัว</th>
+                <th class="py-3 px-4 text-right">รวมต้นทุนสินค้า (บาท)</th>
+              </tr>
+            </thead>
+            <tbody id="skusTableBody" class="divide-y divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: ORDERS EXPLORER -->
+    <div id="tab-content-orders" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="list-checks" class="w-5 h-5 text-indigo-400"></i>
+              <span>ฐานข้อมูลรายการออเดอร์ที่แยกแล้ว (Parsed Orders)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1" id="ordersTotalLabel">แสดงรายการออเดอร์ทั้งหมด</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="orderSearchInput" onkeydown="if(event.key==='Enter') searchOrders()" placeholder="ค้นหาข้อความ/แอดมิน..." class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500">
+            <button onclick="searchOrders()" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium">ค้นหา</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs sm:text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                <th class="py-3 px-3">#</th>
+                <th class="py-3 px-3">วันที่/เวลา</th>
+                <th class="py-3 px-3">ช่องทาง</th>
+                <th class="py-3 px-3">แอดมิน/ผู้ขาย</th>
+                <th class="py-3 px-3">สินค้า / ไซส์</th>
+                <th class="py-3 px-3 text-center">ชำระเงิน</th>
+                <th class="py-3 px-3 text-right">ยอดขาย (บ.)</th>
+                <th class="py-3 px-3 text-right">ต้นทุน (บ.)</th>
+                <th class="py-3 px-3">ข้อความดิบ</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody" class="divide-y divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: COST MASTER MANAGER (70+ SKUs) -->
+    <div id="tab-content-costs" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="calculator" class="w-5 h-5 text-emerald-400"></i>
+              <span>ฐานข้อมูลราคาต้นทุนสินค้าต่อตัว (Cost Master Table)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">บันทึกต้นทุนสำหรับนำไปคำนวณ COGS อัตโนมัติ (สามารถแก้ไขหรือเพิ่มรุ่นใหม่ได้ทันที)</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="openAddSkuModal()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="plus-circle" class="w-4 h-4"></i>
+              <span>เพิ่มรหัส SKU ใหม่</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase font-semibold">
+                <th class="py-3 px-4">รหัสสินค้า (SKU)</th>
+                <th class="py-3 px-4 text-right">ราคาต้นทุน (บาท/ตัว)</th>
+                <th class="py-3 px-4">หมวดหมู่</th>
+                <th class="py-3 px-4">สถานะต้นทุน</th>
+                <th class="py-3 px-4 text-right">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="costsTableBody" class="divide-y divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: AUDIT & RECONCILIATION (FB Page vs Telegram) -->
+    <div id="tab-content-audit" class="space-y-6 hidden">
+      <!-- 4 Fact Summary Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>ออเดอร์ปิดการขายในเพจ (FB Page)</span>
+            <i data-lucide="message-circle" class="w-4 h-4 text-blue-400"></i>
+          </div>
+          <div class="text-2xl font-bold text-white font-mono" id="auditFbOrdersCount">154 บิล</div>
+          <div class="text-xs text-blue-400 mt-1">ดึงเฉพาะออเดอร์สุดท้าย ไม่ซ้ำคน</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>ยอดขายจากเพจ (FB Page Sales)</span>
+            <i data-lucide="dollar-sign" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <div class="text-2xl font-bold text-emerald-400 font-mono" id="auditFbSales">฿222,411.00</div>
+          <div class="text-xs text-slate-400 mt-1">ยอดเงินจริงจากกล่องข้อความ</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>Ads ออนไลน์ (หักขอนแก่นออก)</span>
+            <i data-lucide="trending-up" class="w-4 h-4 text-indigo-400"></i>
+          </div>
+          <div class="text-2xl font-bold text-indigo-400 font-mono">฿49,764.29</div>
+          <div class="text-xs text-slate-400 mt-1">14 แคมเปญออนไลน์ (1-12 ก.ย.)</div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div class="flex items-center justify-between text-slate-400 text-xs mb-1">
+            <span>Ads หน้าร้านเซนทรัล KKC</span>
+            <i data-lucide="store" class="w-4 h-4 text-amber-400"></i>
+          </div>
+          <div class="text-2xl font-bold text-amber-400 font-mono">฿4,218.03</div>
+          <div class="text-xs text-amber-400 mt-1">6 แคมเปญที่มีคำว่า "ขอนแก่น"</div>
+        </div>
+      </div>
+
+      <!-- 3-WAY RECONCILIATION: TELEGRAM/SYSTEM ORDERS VS ONEDRIVE CLOSINGS -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-5">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="scale" class="w-5 h-5 text-emerald-400"></i>
+              <span>3-Way Reconciliation: ยอดแชทออเดอร์ vs รายงานปิดวัน OneDrive vs แอด Meta</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1" id="reconcileSubtitle">
+              เปรียบเทียบยอดขายรายวันระหว่างฐานข้อมูลแชทกับไฟล์ Excel/CSV ที่ดึงจาก OneDrive
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="openOneDriveModal()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+              <i data-lucide="link" class="w-4 h-4"></i>
+              <span>ดึง/อัปเดต OneDrive Link</span>
+            </button>
+            <button onclick="loadAuditTab()" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs border border-slate-700 transition" title="รีเฟรชยอด">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Summary Stats -->
+        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-5 text-xs">
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block mb-0.5">ยอดรวมจากแชทระบบ</span>
+            <span class="text-base font-bold text-white font-mono" id="recSumSysSales">฿0.00</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block mb-0.5">ยอดรวมจาก OneDrive</span>
+            <span class="text-base font-bold text-emerald-400 font-mono" id="recSumOdSales">฿0.00</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block mb-0.5">ผลต่างสุทธิ (Diff)</span>
+            <span class="text-base font-bold text-slate-200 font-mono" id="recSumDiffSales">฿0.00</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 block mb-0.5">ความตรงกัน (Matched Days)</span>
+            <span class="text-base font-bold text-indigo-400 font-mono" id="recSumMatchDays">0 / 0 วัน</span>
+          </div>
+        </div>
+
+        <!-- Reconcile Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">วันที่</th>
+                <th class="py-3 px-3 text-right">ยอดแชทระบบ (บ.)</th>
+                <th class="py-3 px-3 text-center">บิล/ตัว (แชท)</th>
+                <th class="py-3 px-3 text-right">ยอด OneDrive (บ.)</th>
+                <th class="py-3 px-3 text-center">บิล/ตัว (OneDrive)</th>
+                <th class="py-3 px-3 text-right">ส่วนต่าง (บ.)</th>
+                <th class="py-3 px-3 text-center">สถานะตรวจสอบ</th>
+              </tr>
+            </thead>
+            <tbody id="reconcileTableBody" class="divide-y divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Admin Breakdown & Audit Table -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+          <div>
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-5 h-5 text-emerald-400"></i>
+              <span>Audit รายการออเดอร์ปิดการขายจาก Facebook Page (ดึงแต่ออเดอร์สุดท้าย ไม่ซ้ำกัน)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">
+              แอดมินปิดการขายในเพจ: 
+              <span class="text-indigo-400 font-semibold font-mono">mew (135 บิล)</span> • 
+              <span class="text-emerald-400 font-semibold font-mono">som (18 บิล)</span> • 
+              <span class="text-amber-400 font-semibold font-mono">ปาม (1 บิล)</span>
+            </p>
+          </div>
+          <div class="w-64">
+            <input type="text" id="auditSearchInput" oninput="filterAuditTable()" placeholder="ค้นหาชื่อลูกค้า/เบอร์โทร/แอดมิน..." class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-500">
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-slate-800 text-slate-400 uppercase font-semibold">
+                <th class="py-3 px-3">Order ID</th>
+                <th class="py-3 px-3">วันที่/เวลา</th>
+                <th class="py-3 px-3">ลูกค้า / เบอร์โทร</th>
+                <th class="py-3 px-3">สินค้า / ไซส์</th>
+                <th class="py-3 px-3 text-center">ชำระเงิน</th>
+                <th class="py-3 px-3 text-right">ยอดเงิน (บาท)</th>
+                <th class="py-3 px-3">แอดมิน (เพจ)</th>
+                <th class="py-3 px-3">สถานะ Audit</th>
+              </tr>
+            </thead>
+            <tbody id="auditTableBody" class="divide-y divide-slate-800">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 6: SETTINGS -->
+    <div id="tab-content-settings" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-4xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-base font-semibold text-white flex items-center gap-2">
+            <i data-lucide="sliders" class="w-5 h-5 text-indigo-400"></i>
+            <span>ตั้งค่าสูตรค่าใช้จ่าย & การเชื่อมต่อระบบ (System Settings)</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">กำหนดอัตราค่าจ้าง, ค่าคอม, ค่าแอด และ Telegram Token</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Online Rates -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+            <h3 class="text-sm font-semibold text-indigo-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+              <i data-lucide="monitor" class="w-4 h-4"></i>
+              <span>อัตราค่าใช้จ่าย: ช่องทางออนไลน์ (Online Office)</span>
+            </h3>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าคนต่อวัน (333+333+400+33+33):</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingOnlineLabor" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าคอมมิชชั่นแอดมินต่อตัว:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingOnlineComm" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./ตัว</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าจิปาถะ/แพ็คของต่อออเดอร์:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingOnlineMisc" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./ออเดอร์</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าธรรมเนียมปลายทาง COD (% จากยอดปลายทาง):</label>
+              <div class="flex items-center gap-2">
+                <input type="number" step="0.01" id="settingOnlineCodFee" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">%</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KKC Rates -->
+          <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+            <h3 class="text-sm font-semibold text-indigo-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+              <i data-lucide="store" class="w-4 h-4"></i>
+              <span>อัตราค่าใช้จ่าย: หน้าร้านเซนทรัล ขอนแก่น (KKC)</span>
+            </h3>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าเช่าพื้นที่หน้าร้านต่อวัน:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKkcRent" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าคน จันทร์ - พฤหัสบดี:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKkcLaborWeekday" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าคน ศุกร์ - อาทิตย์:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKkcLaborWeekend" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าจิปาถะ/ถุงใส่สินค้าต่อออเดอร์:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKkcMisc" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white">
+                <span class="text-xs text-slate-400">บ./ออเดอร์</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connection Settings -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+          <h3 class="text-sm font-semibold text-indigo-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+            <i data-lucide="link" class="w-4 h-4"></i>
+            <span>การเชื่อมต่อ Facebook Ads & Telegram Bot</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">Facebook Ad Account ID:</label>
+              <input type="text" id="settingFbAdAccount" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">Telegram Bot Token:</label>
+              <input type="password" id="settingTelegramToken" placeholder="123456789:ABCDef..." class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">Telegram Group ID (ออนไลน์ ออฟฟิต):</label>
+              <input type="text" id="settingTelegramOnlineId" placeholder="-100..." class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">Telegram Group ID (หน้าร้านเซนทรัล KKC):</label>
+              <input type="text" id="settingTelegramKkcId" placeholder="-100..." class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white font-mono">
+            </div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-2">
+          <button onclick="saveAllSettings()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold shadow-md">
+            บันทึกการตั้งค่าทั้งหมด
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL 1: SCAN PASTED TEXT MODAL -->
+  <div id="scanModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="clipboard-paste" class="w-5 h-5 text-indigo-400"></i>
+          <span>สแกนออเดอร์จากแชท Telegram (Quick Paste Scanner)</span>
+        </h3>
+        <button onclick="closeScanModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <label class="text-slate-400 block mb-1">เลือกช่องทาง:</label>
+          <select id="scanChannel" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+            <option value="online">💻 ออนไลน์ ออฟฟิต (Online Office)</option>
+            <option value="kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">ระบุวันที่ของออเดอร์:</label>
+          <input type="date" id="scanDate" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+        </div>
+      </div>
+
+      <div>
+        <label class="text-xs text-slate-400 block mb-1">วางข้อความที่ Copy มาจากกลุ่ม Telegram (ได้หลายออเดอร์พร้อมกัน):</label>
+        <textarea id="scanRawText" rows="6" placeholder="ตัวอย่าง:
+คุณสมศรี
+รหัส XRP67 สียีนส์ L 1 ตัว
+ปลายทาง 590
+แอดมินหมวย
+
+xrp55 2 ตัว
+โอน 1050
+แอดมินแนน" class="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs text-slate-100 font-mono focus:border-indigo-500 outline-none"></textarea>
+      </div>
+
+      <!-- File upload alternative -->
+      <div class="border-t border-slate-800 pt-3">
+        <label class="text-xs text-slate-400 block mb-1">หรือ อัปโหลดไฟล์ Export Chat History จาก Telegram Desktop (result.json):</label>
+        <input type="file" id="scanJsonFile" accept=".json" class="text-xs text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-indigo-600/20 file:text-indigo-400 hover:file:bg-indigo-600/30">
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeScanModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">ยกเลิก</button>
+        <button onclick="executeScanOrders()" id="btnSubmitScan" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i data-lucide="check" class="w-4 h-4"></i>
+          <span>สแกนและบันทึกออเดอร์</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: SYNC FB ADS MODAL -->
+  <div id="syncFbModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="refresh-cw" class="w-5 h-5 text-blue-400"></i>
+          <span>ดึงยอดแอด Facebook Ads (Meta Graph API)</span>
+        </h3>
+        <button onclick="closeSyncFbModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-400 leading-relaxed">
+        ระบบจะเรียก API ไปยังบัญชี <code class="text-indigo-400">act_703804833399837</code> เพื่อดึงค่าใช้จ่ายแอดรายวัน และคัดแยกแคมเปญที่มีคำว่า <b>"ขอนแก่น"</b> เข้าหน้าร้าน KKC และแคมเปญอื่นๆ เข้าออนไลน์โดยอัตโนมัติ
+      </p>
+
+      <div class="grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <label class="text-slate-400 block mb-1">ตั้งแต่วันที่:</label>
+          <input type="date" id="fbSinceDate" value="2026-08-01" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">ถึงวันที่:</label>
+          <input type="date" id="fbUntilDate" value="2026-09-13" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeSyncFbModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">ยกเลิก</button>
+        <button onclick="executeSyncFbAds()" id="btnSubmitSyncFb" class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i>
+          <span>เริ่มดึงข้อมูล Ads</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: ADD/EDIT SKU MODAL -->
+  <div id="skuModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2" id="skuModalTitle">
+          <i data-lucide="tag" class="w-5 h-5 text-emerald-400"></i>
+          <span>แก้ไข/เพิ่มรหัสสินค้า</span>
+        </h3>
+        <button onclick="closeSkuModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400 block mb-1">รหัสสินค้า (SKU):</label>
+          <input type="text" id="modalSkuCode" placeholder="เช่น XRP67, AR01, AR23ขาว" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono uppercase">
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">ราคาต้นทุน (บาท/ตัว):</label>
+          <input type="number" step="0.01" id="modalSkuCost" placeholder="495.00" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono">
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">หมวดหมู่ / หมายเหตุ:</label>
+          <input type="text" id="modalSkuNote" placeholder="กางเกงยีนส์กระบอกเล็ก" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeSkuModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">ยกเลิก</button>
+        <button onclick="saveSkuCostFromModal()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold">
+          บันทึกต้นทุน
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: STOREFRONT DAILY ENTRY MODAL -->
+  <div id="storefrontModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="store" class="w-5 h-5 text-amber-400"></i>
+          <span>บันทึกยอดขายหน้าร้านเซนทรัล KKC</span>
+        </h3>
+        <button onclick="closeStorefrontModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-400 block mb-1">ประจำวันที่:</label>
+          <input type="date" id="storefrontDate" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 block mb-1">ยอดขายรวม (บาท):</label>
+            <input type="number" step="0.01" id="storefrontSales" placeholder="เช่น 18500" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono">
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-1">จำนวนตัวที่ขายได้:</label>
+            <input type="number" id="storefrontPieces" placeholder="เช่น 24" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono">
+          </div>
+        </div>
+        <div>
+          <label class="text-slate-400 block mb-1">หมายเหตุ / ก๊อปปี้รายงานจาก Telegram:</label>
+          <textarea id="storefrontNote" rows="3" placeholder="เช่น รายงานยอดขายประจำวัน กะเช้า-กะเย็น" class="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-slate-200 font-mono"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeStorefrontModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">ยกเลิก</button>
+        <button onclick="saveStorefrontEntry()" class="px-5 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          <span>บันทึกยอดหน้าร้าน</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: ONEDRIVE & FAST CLOSING REPORT MODAL -->
+  <div id="onedriveModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-xl w-full p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-400"></i>
+          <span>นำเข้ารายงานปิดวัน (OneDrive / วางข้อความ Excel)</span>
+        </h3>
+        <button onclick="closeOneDriveModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Option 1: Fast Direct Paste (Recommended) -->
+      <div class="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+            <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
+            <span>1. วางข้อความสรุปปิดวันจาก Excel ทันที (สะดวกและเร็วที่สุด):</span>
+          </label>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">แนะนำ</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          ก๊อปปี้แถวสรุปปิดวันจาก Excel ของหน้าร้าน KKC หรือ ออนไลน์ (เช่น 1-Sep ยอดขาย โอน... หรือคัดลอกตารางมาทั้งแผ่น) แล้ววางลงช่องนี้ได้เลย
+        </p>
+        <textarea id="onedrivePasteText" rows="5" placeholder="วางข้อความที่ก๊อปปี้จาก Excel ได้เลย เช่น:&#10;1-Sep	ยอดขาย เงินสด	 -&#10;1-Sep	ยอดขาย โอน	 2,280.00&#10;1-Sep	จำนวนออเดอร์ (คน)	 1.00&#10;1-Sep	จำนวนตัว	 2.00&#10;1-Sep	ต้นทุนสินค้า	 985.95&#10;1-Sep	ค่าเช่า/ ต่อวัน	 828.30&#10;1-Sep	ค่าใช้จ่ายพนักงาน	 460.00&#10;1-Sep	ค่าโฆษณา (ads)	 364.55&#10;1-Sep	กำไร/ขาดทุน สุทธิ	 (358.80)..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono text-xs focus:border-emerald-500 outline-none"></textarea>
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] text-slate-400">บันทึกเข้า:</span>
+            <select id="onedrivePasteChannel" class="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-slate-200 text-xs">
+              <option value="storefront_kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+              <option value="online">💻 ออนไลน์ ออฟฟิต</option>
+            </select>
+          </div>
+          <button onclick="executePasteClosing()" id="btnSubmitPasteClosing" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+            <span>นำเข้าข้อความปิดวันทันที</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="relative flex py-0.5 items-center">
+        <div class="flex-grow border-t border-slate-800"></div>
+        <span class="flex-shrink mx-3 text-slate-500 text-[11px]">หรือ นำเข้าผ่านไฟล์ / ลิงก์</span>
+        <div class="flex-grow border-t border-slate-800"></div>
+      </div>
+
+      <!-- Option 2: Share Link / File Upload -->
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-300 font-medium block mb-1">2. วาง OneDrive Public Share Link:</label>
+          <input type="url" id="onedriveUrlInput" placeholder="https://1drv.ms/x/... หรือ ลิงก์แชร์แบบ Anyone with link" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:border-emerald-500 outline-none">
+          <p class="text-[10.5px] text-slate-500 mt-1">
+            ⚠️ ลิงก์ที่เป็น <code class="text-indigo-400">doc2.aspx</code> เป็นหน้าเว็บพรีวิวในเบราว์เซอร์ส่วนตัวของ Microsoft (ต้องมีสิทธิ์ล็อกอิน) จึงแนะนำให้ใช้วิธีวางข้อความด้านบน หรือแชร์ลิงก์แบบ "ทุกคนที่มีลิงก์ (Anyone with link)"
+          </p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 block mb-1">ช่องทางสำหรับไฟล์นี้:</label>
+            <select id="onedriveChannelSelect" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+              <option value="storefront_kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+              <option value="online">💻 ออนไลน์ ออฟฟิต</option>
+              <option value="both">⚡ อัตโนมัติ (ตรวจตามชีต)</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-1">หรือ อัปโหลดไฟล์ Excel / CSV:</label>
+            <input type="file" id="onedriveLocalFile" accept=".xlsx,.xls,.csv" class="w-full text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-md file:border-0 file:text-[11px] file:font-medium file:bg-emerald-600/20 file:text-emerald-400 hover:file:bg-emerald-600/30">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+        <button onclick="closeOneDriveModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">ปิด</button>
+        <button onclick="executeSyncOneDrive()" id="btnSubmitOneDrive" class="px-5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>ดึงข้อมูลจากลิงก์/ไฟล์</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 6: TELEGRAM HUB MODAL -->
+  <div id="telegramModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i data-lucide="send" class="w-5 h-5 text-sky-400"></i>
+          <span>เชื่อมต่อ Telegram Hub (ดึงยอดหน้าร้าน & ออนไลน์)</span>
+        </h3>
+        <button onclick="closeTelegramModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Telegram Status Badge -->
+      <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-slate-500" id="tgStatusDot"></span>
+          <span class="font-medium text-slate-300" id="tgStatusText">กำลังตรวจสอบสถานะ Telegram...</span>
+        </div>
+        <button onclick="checkTelegramStatus()" class="text-slate-400 hover:text-white text-[11px] underline">รีเฟรชสถานะ</button>
+      </div>
+
+      <!-- Pending OTP Notice Banner (Dynamic) -->
+      <div id="tgPendingOtpBanner" class="hidden p-3 rounded-xl bg-sky-950/40 border border-sky-500/40 text-xs text-sky-200 flex items-start gap-2.5">
+        <i data-lucide="bell-ring" class="w-5 h-5 text-sky-400 shrink-0 mt-0.5"></i>
+        <div>
+          <span class="font-semibold block text-white" id="tgPendingOtpTitle">รหัส OTP ถูกส่งไปยังแอป Telegram ของคุณแล้ว</span>
+          <span class="text-[11px] text-sky-300/90" id="tgPendingOtpDesc">กรุณาเปิดดูในแอป Telegram แล้วนำรหัส 5 หลักมากรอกในช่องด้านล่างเพื่อเข้าสู่ระบบ</span>
+        </div>
+      </div>
+
+      <!-- Option 1: Telegram Bot (Recommended for Future) -->
+      <div class="p-3.5 rounded-xl bg-sky-950/40 border border-sky-500/40 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <label class="text-xs font-semibold text-sky-300 flex items-center gap-1.5">
+            <i data-lucide="bot" class="w-4 h-4"></i>
+            <span>วิธีที่ 1: ใช้ Telegram Bot เข้ากลุ่ม (ดูดยอดอัตโนมัติ 24 ชม.)</span>
+          </label>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 font-medium">แนะนำที่สุด</span>
+        </div>
+        
+        <!-- Bot Live Info Badge -->
+        <div id="tgBotInfoCard" class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 space-y-2 text-xs">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span id="tgBotStatusDot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+              <span id="tgBotNameText" class="font-mono font-semibold text-white">กำลังตรวจสถานะบอท...</span>
+            </div>
+            <button onclick="checkTelegramBotStatus()" class="text-sky-400 hover:text-sky-300 text-[11px] underline">เช็คสถานะใหม่</button>
+          </div>
+          <div id="tgBotAdminNotice" class="text-[11px] leading-relaxed p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200">
+            ⚠️ <b>ข้อสำคัญเพื่อให้บอทอ่านข้อความในกลุ่มได้:</b><br>
+            เนื่องจาก Telegram มีระบบ Privacy ป้องกันบอทแอบอ่านแชททั่วไป คุณต้อง <b>ตั้งบอทให้เป็น "ผู้ดูแลกลุ่ม" (Admin)</b> ในกลุ่มหน้าร้านขอนแก่น (Jeans around kkc) หรือส่ง <code class="bg-black/40 px-1 py-0.5 rounded">/setprivacy -> Disable</code> ให้ @BotFather บอทจึงจะได้รับข้อความออเดอร์ของพนักงานครับ
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <input type="text" id="modalTgBotToken" placeholder="วาง Bot Token (เช่น 8582637848:AAHveDb0...)" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono text-xs focus:border-sky-500 outline-none">
+          <button onclick="saveModalTgBotToken()" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold whitespace-nowrap transition">บันทึกบอท</button>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="relative flex py-0.5 items-center">
+        <div class="flex-grow border-t border-slate-800"></div>
+        <span class="flex-shrink mx-3 text-slate-500 text-[11px]">หรือ ล็อกอินด้วยเบอร์โทร (สำหรับดึงประวัติเก่า)</span>
+        <div class="flex-grow border-t border-slate-800"></div>
+      </div>
+
+      <!-- Option 2: Telethon Phone Login -->
+      <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-3 text-xs">
+        <div class="flex items-center justify-between">
+          <span class="font-semibold text-slate-300 flex items-center gap-1.5">
+            <i data-lucide="smartphone" class="w-4 h-4 text-amber-400"></i>
+            <span>วิธีที่ 2: ล็อกอินบัญชีด้วยเบอร์โทรศัพท์</span>
+          </span>
+          <span class="text-[10px] text-slate-500 font-mono" id="tgPhoneHint">รหัสจะส่งเข้าแอป Telegram</span>
+        </div>
+        
+        <p class="text-[11px] text-amber-300/90 leading-relaxed bg-amber-500/10 p-2 rounded-lg border border-amber-500/20">
+          ⚠️ <b>ข้อสำคัญ:</b> Telegram <u>ไม่ส่งรหัสทาง SMS มือถือ</u> แต่จะส่งเป็นข้อความแชทจาก Official Account ชื่อ <b>"Telegram"</b> เข้าไปในแอป Telegram ในเครื่องที่คุณใช้อยู่ กรุณาเปิดดูในแอป Telegram เพื่อนำรหัสมากรอก
+        </p>
+
+        <!-- Section A: Login with Phone (If not logged in) -->
+        <div id="tgLoginSection" class="space-y-3">
+          <div class="flex items-center gap-2">
+            <input type="text" id="tgPhoneInput" placeholder="0830789329 หรือ +66830789329" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono text-xs focus:border-sky-500 outline-none">
+            <button onclick="requestTelegramOtp()" id="btnSendOtp" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded font-medium">ส่ง OTP</button>
+          </div>
+          <div id="tgCodeGroup" class="hidden space-y-2.5 pt-2 border-t border-slate-800">
+            <label class="text-slate-300 font-medium block">กรอกรหัส OTP 5 หลักที่ได้รับในแอป Telegram:</label>
+            <div class="flex items-center gap-2">
+              <input type="text" id="tgOtpInput" placeholder="รหัส OTP 5 หลัก" class="w-36 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-200 font-mono text-xs text-center tracking-widest font-bold focus:border-emerald-500 outline-none">
+              <input type="password" id="tgPasswordInput" placeholder="รหัส 2FA (ถ้าเปิดใช้)" class="flex-1 bg-slate-900 border border-slate-700 rounded px-3 py-2 text-slate-200 text-xs">
+              <button onclick="verifyTelegramOtp()" id="btnVerifyOtp" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium">ยืนยันรหัส</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section B: Sync Groups (If logged in) -->
+      <div id="tgSyncSection" class="hidden space-y-3 text-xs">
+        <div class="flex items-center justify-between">
+          <label class="text-slate-300 font-semibold">เลือกกลุ่ม Telegram ที่ต้องการดึงออเดอร์:</label>
+          <button onclick="loadTelegramDialogs()" class="text-indigo-400 hover:underline text-[11px]">โหลดรายชื่อกลุ่มใหม่</button>
+        </div>
+        <select id="tgDialogsSelect" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200 text-xs font-mono">
+          <option value="">-- กำลังโหลดรายชื่อกลุ่ม --</option>
+        </select>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 block mb-1">บันทึกเข้าช่องทาง:</label>
+            <select id="tgSyncTargetChannel" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+              <option value="storefront_kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+              <option value="online">💻 ออนไลน์ ออฟฟิต</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-slate-400 block mb-1">ดึงย้อนหลังตั้งแต่วันที่:</label>
+            <input type="date" id="tgSinceDate" value="2026-08-01" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
+          </div>
+        </div>
+
+        <button onclick="executeTelegramGroupSync()" id="btnExecuteTgSync" class="w-full py-2.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-semibold flex items-center justify-center gap-2 shadow-sm">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i>
+          <span>เริ่มดึงออเดอร์จากกลุ่มที่เลือก</span>
+        </button>
+      </div>
+
+      <div class="flex items-center justify-end pt-2 border-t border-slate-800">
+        <button onclick="closeTelegramModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs">ปิด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 bg-slate-900 border border-slate-700 text-slate-100 px-4 py-3 rounded-xl shadow-2xl transition-all duration-300 translate-y-20 opacity-0 flex items-center gap-3 text-xs">
+    <div id="toastIcon" class="text-emerald-400"><i data-lucide="check-circle" class="w-5 h-5"></i></div>
+    <div id="toastMsg">ดำเนินการสำเร็จ</div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    // State
+    let currentChannel = 'online';
+    let currentTab = 'pnl';
+    let trendChartInstance = null;
+    let cachedSkuCosts = [];
+
+    // Initialize Lucide icons
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      initTodayDates();
+      loadCurrentReport();
+      loadSettings();
+      checkTelegramStatus();
+    });
+
+    function initTodayDates() {
+      const today = new Date();
+      const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const todayStr = fmt(today);
+      const monthStart = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+      
+      // Set date inputs to today
+      document.getElementById("inputStartDate").value = todayStr;
+      document.getElementById("inputEndDate").value = todayStr;
+
+      // Generate day chips from 1st of month to today
+      const chips = document.getElementById("singleDayChips");
+      const thaiMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      chips.innerHTML = '';
+      for (let d = 1; d <= today.getDate(); d++) {
+        const dateStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const label = `${d} ${thaiMonths[today.getMonth()]}`;
+        const isToday = d === today.getDate();
+        const btn = document.createElement('button');
+        btn.className = isToday
+          ? "day-chip px-2 py-0.5 rounded text-white bg-indigo-600 border border-indigo-500 font-bold shadow-sm transition"
+          : "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
+        btn.setAttribute('data-date', dateStr);
+        btn.setAttribute('onclick', `selectSingleDay('${dateStr}')`);
+        btn.textContent = label;
+        chips.appendChild(btn);
+      }
+      updateActivePeriodBadge();
+    }
+
+
+    function showToast(msg, isError = false) {
+      const toast = document.getElementById("toast");
+      const toastMsg = document.getElementById("toastMsg");
+      const toastIcon = document.getElementById("toastIcon");
+      toastMsg.innerText = msg;
+      toastIcon.className = isError ? "text-rose-400" : "text-emerald-400";
+      toastIcon.innerHTML = isError ? `<i data-lucide="alert-circle" class="w-5 h-5"></i>` : `<i data-lucide="check-circle" class="w-5 h-5"></i>`;
+      lucide.createIcons();
+      toast.classList.remove("translate-y-20", "opacity-0");
+      setTimeout(() => {
+        toast.classList.add("translate-y-20", "opacity-0");
+      }, 3500);
+    }
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll("[id^='tab-content-']").forEach(el => el.classList.add("hidden"));
+      const target = document.getElementById(`tab-content-${tabId}`);
+      if (target) target.classList.remove("hidden");
+
+      document.querySelectorAll(".tab-btn").forEach(b => {
+        b.className = "tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 text-slate-300 hover:bg-slate-800 hover:text-white transition";
+      });
+      const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+      if (activeBtn) {
+        activeBtn.className = "tab-btn px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 bg-indigo-600 text-white shadow-sm";
+      }
+
+      if (tabId === "pnl") loadCurrentReport();
+      else if (tabId === "admins") {
+        if (!window.lastReportData) loadCurrentReport();
+        else renderAdminsTab();
+      }
+      else if (tabId === "skus") {
+        if (!window.lastReportData) loadCurrentReport();
+        else renderSkusTab();
+      }
+      else if (tabId === "orders") loadOrdersTab();
+      else if (tabId === "costs") loadCostMasterTab();
+      else if (tabId === "audit") loadAuditTab();
+      else if (tabId === "settings") loadSettings();
+
+      lucide.createIcons();
+    }
+
+    function setChannel(ch) {
+      currentChannel = ch;
+      ['online', 'kkc', 'consolidated'].forEach(c => {
+        const btn = document.getElementById(`ch-${c}`);
+        if (btn) {
+          if (c === ch) {
+            btn.className = "px-3 py-1 rounded-md font-semibold text-white bg-indigo-600 transition flex items-center gap-1 shadow-sm";
+          } else {
+            btn.className = "px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1";
+          }
+        }
+      });
+      loadCurrentReport();
+    }
+
+    function setDatePreset(preset) {
+      // Clear preset buttons
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.className = "preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition";
+      });
+      const targetBtn = document.getElementById(`preset-${preset}`);
+      if (targetBtn) {
+        targetBtn.className = "preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition";
+      }
+
+      // Reset day chips
+      document.querySelectorAll('.day-chip').forEach(c => {
+        c.className = "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
+      });
+
+      let start = new Date(2026, 8, 1);
+      let end = new Date(2026, 8, 12);
+
+      if (preset === 'today') {
+        start = new Date(2026, 8, 12);
+        end = new Date(2026, 8, 12);
+      } else if (preset === 'yesterday') {
+        start = new Date(2026, 8, 11);
+        end = new Date(2026, 8, 11);
+      } else if (preset === '7d') {
+        start = new Date(2026, 8, 6);
+        end = new Date(2026, 8, 12);
+      } else if (preset === 'sep') {
+        start = new Date(2026, 8, 1);
+        end = new Date(); // today
+      } else if (preset === 'aug') {
+        start = new Date(2026, 7, 1);
+        end = new Date(2026, 7, 31);
+      }
+
+      const formatDate = (d) => {
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+
+      document.getElementById("inputStartDate").value = formatDate(start);
+      document.getElementById("inputEndDate").value = formatDate(end);
+      updateActivePeriodBadge();
+      loadCurrentReport();
+    }
+
+    function selectSingleDay(dateStr) {
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.className = "preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition";
+      });
+      document.querySelectorAll('.day-chip').forEach(c => {
+        if (c.getAttribute('data-date') === dateStr) {
+          c.className = "day-chip px-2 py-0.5 rounded text-white bg-indigo-600 border border-indigo-500 font-bold shadow-sm transition";
+        } else {
+          c.className = "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
+        }
+      });
+      document.getElementById("inputStartDate").value = dateStr;
+      document.getElementById("inputEndDate").value = dateStr;
+      updateActivePeriodBadge();
+      loadCurrentReport();
+    }
+
+    function handleDateChange() {
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.className = "preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition";
+      });
+      document.querySelectorAll('.day-chip').forEach(c => {
+        c.className = "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
+      });
+      updateActivePeriodBadge();
+      loadCurrentReport();
+    }
+
+    function updateActivePeriodBadge() {
+      const start = document.getElementById("inputStartDate").value;
+      const end = document.getElementById("inputEndDate").value;
+      const badgeText = document.getElementById("activePeriodText");
+      if (badgeText) {
+        if (start === end) {
+          badgeText.innerText = `ดูเฉพาะวันที่: ${start}`;
+        } else {
+          badgeText.innerText = `ช่วงวันที่: ${start} - ${end}`;
+        }
+      }
+    }
+
+    async function loadCurrentReport() {
+      const start = document.getElementById("inputStartDate").value;
+      const end = document.getElementById("inputEndDate").value;
+      updateActivePeriodBadge();
+
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : 'งบรวมทั้งบริษัท');
+      document.getElementById("pnlPeriodSubtitle").innerText = `ช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel}`;
+
+      try {
+        const res = await fetch(`/api/pnl?start_date=${start}&end_date=${end}&channel=${currentChannel}`);
+        const data = await res.json();
+        window.lastReportData = data;
+        renderPnlData(data);
+        if (currentTab === 'admins') renderAdminsTab();
+        else if (currentTab === 'skus') renderSkusTab();
+        else if (currentTab === 'audit') loadAuditTab();
+      } catch (err) {
+        console.error("Failed to load P&L:", err);
+      }
+    }
+
+    function formatNumber(num) {
+      return Number(num).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function renderPnlData(data) {
+      const kpi = data.kpi;
+      // 1. KPI Cards
+      document.getElementById("kpiSales").innerText = `฿${formatNumber(kpi.sales)}`;
+      document.getElementById("kpiOrdersCount").innerText = `${kpi.orders_count.toLocaleString()} ออเดอร์`;
+      document.getElementById("kpiPiecesCount").innerText = `${kpi.pieces_count.toLocaleString()} ตัว`;
+
+      document.getElementById("kpiCogs").innerText = `฿${formatNumber(kpi.cogs)}`;
+      const cogsPct = kpi.sales > 0 ? (kpi.cogs / kpi.sales * 100).toFixed(2) : "0.00";
+      document.getElementById("kpiCogsPct").innerText = `${cogsPct}%`;
+
+      document.getElementById("kpiExpenses").innerText = `฿${formatNumber(kpi.expenses)}`;
+      document.getElementById("kpiExpensesPct").innerText = `${kpi.expenses_pct.toFixed(2)}%`;
+
+      const netProfitEl = document.getElementById("kpiNetProfit");
+      const netMarginEl = document.getElementById("kpiNetMargin");
+      const netBar = document.getElementById("netProfitBar");
+
+      netProfitEl.innerText = `฿${formatNumber(kpi.net_profit)}`;
+      netMarginEl.innerText = `${kpi.net_margin.toFixed(2)}%`;
+
+      if (kpi.net_profit >= 0) {
+        netProfitEl.className = "text-2xl font-bold tracking-tight text-emerald-400";
+        netMarginEl.className = "font-bold font-mono px-2 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        netBar.className = "absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-600 to-teal-400";
+      } else {
+        netProfitEl.className = "text-2xl font-bold tracking-tight text-rose-400";
+        netMarginEl.className = "font-bold font-mono px-2 py-0.5 rounded text-xs bg-rose-500/20 text-rose-300 border border-rose-500/30";
+        netBar.className = "absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-rose-600 to-red-500";
+      }
+
+      // 2. Main P&L Statement Table
+      const tbody = document.getElementById("pnlTableBody");
+      tbody.innerHTML = "";
+
+      data.pnl_statement.forEach(row => {
+        const tr = document.createElement("tr");
+        const isBold = row.bold;
+        const isHeader = row.type === "header";
+        const isSub = row.type === "sub";
+        const isNet = row.type === "net_profit";
+        const isGross = row.type === "gross_profit";
+        const isCost = row.type === "cost";
+
+        let rowClass = "hover:bg-slate-800/40 transition";
+        if (isNet) rowClass = "bg-slate-800/80 font-bold border-t-2 border-slate-700";
+        else if (isGross) rowClass = "bg-slate-900/90 font-semibold";
+        else if (isHeader) rowClass = "bg-slate-950/40 font-semibold text-slate-300";
+        else if (isSub) rowClass = "text-slate-400 text-xs";
+
+        tr.className = rowClass;
+
+        // Amount coloring
+        let amountClass = isBold ? "font-bold text-white font-mono" : "text-slate-200 font-mono";
+        if (isNet) amountClass = row.amount >= 0 ? "font-bold text-emerald-400 font-mono text-base" : "font-bold text-rose-400 font-mono text-base";
+        else if (isCost || row.type === "expense") amountClass = "text-rose-300/90 font-mono";
+        else if (row.type === "revenue" || isGross) amountClass = "text-emerald-300 font-mono font-bold";
+
+        // Percentage Badge
+        let pctBadgeClass = "text-slate-300 font-mono";
+        if (isNet) pctBadgeClass = row.pct >= 0 ? "text-emerald-400 font-bold font-mono" : "text-rose-400 font-bold font-mono";
+        else if (row.type === "revenue") pctBadgeClass = "text-indigo-400 font-bold font-mono";
+
+        // Bar calculation
+        const barWidth = Math.min(Math.abs(row.pct), 100);
+        let barColor = "bg-slate-600";
+        if (row.type === "revenue") barColor = "bg-indigo-500";
+        else if (isGross) barColor = "bg-emerald-500";
+        else if (row.type === "cost") barColor = "bg-amber-500";
+        else if (row.type === "expense") barColor = "bg-rose-500";
+        else if (isNet) barColor = row.amount >= 0 ? "bg-emerald-400" : "bg-rose-400";
+
+        tr.innerHTML = `
+          <td class="py-3 px-6 ${isSub ? 'pl-10 text-slate-400' : ''} ${isBold ? 'text-white' : ''}">
+            ${row.label}
+          </td>
+          <td class="py-3 px-6 text-right ${amountClass}">
+            ฿${formatNumber(row.amount)}
+          </td>
+          <td class="py-3 px-6 text-right ${pctBadgeClass}">
+            ${row.pct.toFixed(2)}%
+          </td>
+          <td class="py-3 px-6 hidden md:table-cell">
+            <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+              <div class="${barColor} h-2 rounded-full transition-all duration-500" style="width: ${barWidth}%"></div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // 3. Render Trend Chart
+      renderTrendChart(data.daily_trend);
+
+      // Cache for other tabs
+      window.lastReportData = data;
+    }
+
+    function renderTrendChart(dailyData) {
+      if (!dailyData || dailyData.length === 0) return;
+      const ctx = document.getElementById("trendChart").getContext("2d");
+      if (trendChartInstance) {
+        trendChartInstance.destroy();
+      }
+
+      const labels = dailyData.map(d => `${d.date.slice(5)} (${d.day_name})`);
+      const sales = dailyData.map(d => d.sales);
+      const grossProfit = dailyData.map(d => d.gross_profit);
+
+      trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'ยอดขาย (Sales)',
+              data: sales,
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99, 102, 241, 0.12)',
+              borderWidth: 2,
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'กำไรขั้นต้น (Gross Profit)',
+              data: grossProfit,
+              borderColor: '#10b981',
+              backgroundColor: 'transparent',
+              borderWidth: 2,
+              borderDash: [4, 4],
+              tension: 0.3
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (evt, elements) => {
+            if (elements && elements.length > 0) {
+              const idx = elements[0].index;
+              const selDate = dailyData[idx].date;
+              selectSingleDay(selDate);
+              showToast(`กรองเฉพาะข้อมูลวันที่ ${selDate}`);
+            }
+          },
+          plugins: {
+            legend: {
+              labels: { color: '#94a3b8', font: { family: 'Prompt', size: 11 } }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#64748b', font: { size: 10 } },
+              grid: { color: '#1e293b' }
+            },
+            y: {
+              ticks: { color: '#64748b', font: { size: 10 }, callback: v => '฿' + (v/1000) + 'k' },
+              grid: { color: '#1e293b' }
+            }
+          }
+        }
+      });
+    }
+
+    // ---------------- TAB 2: ADMINS ---------------- //
+    function renderAdminsTab() {
+      const data = window.lastReportData;
+      if (!data) return;
+      const start = document.getElementById("inputStartDate").value;
+      const end = document.getElementById("inputEndDate").value;
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : 'งบรวมทั้งบริษัท');
+      const subEl = document.getElementById("adminsPeriodSubtitle");
+      if (subEl) {
+        if (start === end) {
+          subEl.innerText = `📅 ข้อมูลเฉพาะวันที่: ${start} • ช่องทาง: ${channelLabel} (พบแอดมินปิดยอด ${data.admin_leaderboard.length} คน)`;
+        } else {
+          subEl.innerText = `📅 ข้อมูลช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel} (พบแอดมินปิดยอด ${data.admin_leaderboard.length} คน)`;
+        }
+      }
+      const tbody = document.getElementById("adminsTableBody");
+      tbody.innerHTML = "";
+
+      data.admin_leaderboard.forEach((adm, idx) => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/40 transition";
+        const rank = idx + 1;
+        const rankBadge = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : `#${rank}`));
+
+        tr.innerHTML = `
+          <td class="py-3.5 px-4 font-semibold text-slate-400">${rankBadge}</td>
+          <td class="py-3.5 px-4 font-semibold text-white flex items-center gap-2">
+            <span class="w-7 h-7 rounded-full bg-indigo-600/30 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xs font-bold">
+              ${adm.admin_name.charAt(0)}
+            </span>
+            <span>${adm.admin_name}</span>
+          </td>
+          <td class="py-3.5 px-4 text-center text-slate-300 font-mono">${adm.orders_count} บิล</td>
+          <td class="py-3.5 px-4 text-center text-blue-400 font-semibold font-mono">${adm.pieces} ตัว</td>
+          <td class="py-3.5 px-4 text-right font-mono text-emerald-400 font-semibold">฿${formatNumber(adm.sales)}</td>
+          <td class="py-3.5 px-4 text-right font-mono text-slate-400">${adm.sales_pct}%</td>
+          <td class="py-3.5 px-4 text-right font-mono font-bold text-amber-400 text-base">฿${formatNumber(adm.commission)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ---------------- TAB 3: SKUS ---------------- //
+    function renderSkusTab() {
+      const data = window.lastReportData;
+      if (!data) return;
+      const tbody = document.getElementById("skusTableBody");
+      tbody.innerHTML = "";
+
+      data.sku_breakdown.forEach(item => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/40 transition";
+
+        // Size pills
+        const sizeBadges = Object.entries(item.sizes).map(([sz, qty]) => {
+          return `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 text-xs font-mono mr-1.5 mb-1">
+            <span class="text-indigo-400 font-bold">${sz || 'N/A'}:</span> ${qty}
+          </span>`;
+        }).join("");
+
+        tr.innerHTML = `
+          <td class="py-3.5 px-4 font-mono font-bold text-white flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">${item.sku}</span>
+          </td>
+          <td class="py-3.5 px-4 text-center font-bold text-blue-400 font-mono text-base">${item.total_pieces} ตัว</td>
+          <td class="py-3.5 px-4">${sizeBadges}</td>
+          <td class="py-3.5 px-4 text-right font-mono text-slate-300">฿${formatNumber(item.unit_cost)}</td>
+          <td class="py-3.5 px-4 text-right font-mono font-bold text-amber-400">฿${formatNumber(item.total_cost)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterSkuTable() {
+      const query = document.getElementById("skuSearchInput").value.toUpperCase();
+      const rows = document.getElementById("skusTableBody").getElementsByTagName("tr");
+      for (let r of rows) {
+        r.style.display = r.innerText.toUpperCase().includes(query) ? "" : "none";
+      }
+    }
+
+    // ---------------- TAB 4: ORDERS ---------------- //
+    async function loadOrdersTab(searchQuery = "") {
+      const start = document.getElementById("inputStartDate").value;
+      const end = document.getElementById("inputEndDate").value;
+      let url = `/api/orders?start_date=${start}&end_date=${end}&channel=${currentChannel}&limit=100`;
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        document.getElementById("ordersTotalLabel").innerText = `พบทั้งหมด ${data.total.toLocaleString()} ออเดอร์`;
+
+        const tbody = document.getElementById("ordersTableBody");
+        tbody.innerHTML = "";
+
+        data.orders.forEach(o => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-slate-800/40 transition text-xs";
+
+          const channelBadge = o.source_channel === "online" 
+            ? `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">ออนไลน์</span>`
+            : `<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">หน้าร้าน KKC</span>`;
+
+          const paymentBadge = o.payment_method === "ปลายทาง"
+            ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-medium">ปลายทาง</span>`
+            : `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">โอน</span>`;
+
+          const itemsText = o.items.map(it => `${it.sku} (${it.size || '-'}) x${it.quantity}`).join(", ");
+
+          tr.innerHTML = `
+            <td class="py-3 px-3 text-slate-500 font-mono">#${o.id}</td>
+            <td class="py-3 px-3 text-slate-300 font-mono">${o.order_date}<br><span class="text-[10px] text-slate-500">${o.order_time ? o.order_time.slice(11) : ''}</span></td>
+            <td class="py-3 px-3">${channelBadge}</td>
+            <td class="py-3 px-3 font-medium text-slate-200">${o.sender_name || 'แอดมิน'}</td>
+            <td class="py-3 px-3 font-mono text-indigo-300">${itemsText}</td>
+            <td class="py-3 px-3 text-center">${paymentBadge}</td>
+            <td class="py-3 px-3 text-right font-mono font-bold text-white">฿${formatNumber(o.total_sales)}</td>
+            <td class="py-3 px-3 text-right font-mono text-amber-400">฿${formatNumber(o.cogs_total)}</td>
+            <td class="py-3 px-3 text-slate-400 max-w-xs truncate" title="${o.raw_text.replace(/"/g, '&quot;')}">${o.raw_text}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error("Failed to load orders:", err);
+      }
+    }
+
+    function searchOrders() {
+      const q = document.getElementById("orderSearchInput").value.trim();
+      loadOrdersTab(q);
+    }
+
+    // ---------------- TAB 5: COST MASTER (70+ SKUs) ---------------- //
+    async function loadCostMasterTab() {
+      try {
+        const res = await fetch('/api/sku-costs');
+        cachedSkuCosts = await res.json();
+        const tbody = document.getElementById("costsTableBody");
+        tbody.innerHTML = "";
+
+        cachedSkuCosts.forEach(item => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-slate-800/40 transition";
+
+          const isMissing = Number(item.cost) === 0;
+          const statusBadge = isMissing 
+            ? `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-semibold">⚠️ ยังไม่ระบุต้นทุน</span>`
+            : `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold">✓ บันทึกแล้ว</span>`;
+
+          tr.innerHTML = `
+            <td class="py-3 px-4 font-mono font-bold text-white">
+              <span class="px-2 py-1 bg-slate-800 border border-slate-700 rounded">${item.sku}</span>
+            </td>
+            <td class="py-3 px-4 text-right font-mono font-bold ${isMissing ? 'text-rose-400' : 'text-emerald-400'}">
+              ฿${formatNumber(item.cost)}
+            </td>
+            <td class="py-3 px-4 text-slate-400 text-xs">${item.category || 'Jeans'}</td>
+            <td class="py-3 px-4">${statusBadge}</td>
+            <td class="py-3 px-4 text-right">
+              <button onclick="openEditSkuModal('${item.sku}', ${item.cost}, '${item.note || ''}')" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded text-xs border border-slate-700 font-medium mr-1.5">
+                แก้ไข
+              </button>
+              <button onclick="deleteSku('${item.sku}')" class="px-2 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded text-xs border border-rose-500/30">
+                ลบ
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error("Failed to load sku costs:", err);
+      }
+    }
+
+    function openAddSkuModal() {
+      document.getElementById("skuModalTitle").innerHTML = `<i data-lucide="plus" class="w-5 h-5 text-emerald-400"></i><span>เพิ่มรหัสสินค้าใหม่</span>`;
+      document.getElementById("modalSkuCode").value = "";
+      document.getElementById("modalSkuCode").disabled = false;
+      document.getElementById("modalSkuCost").value = "";
+      document.getElementById("modalSkuNote").value = "";
+      document.getElementById("skuModal").classList.remove("hidden");
+      document.getElementById("skuModal").classList.add("flex");
+      lucide.createIcons();
+    }
+
+    function openEditSkuModal(sku, cost, note) {
+      document.getElementById("skuModalTitle").innerHTML = `<i data-lucide="edit" class="w-5 h-5 text-indigo-400"></i><span>แก้ไขต้นทุน ${sku}</span>`;
+      document.getElementById("modalSkuCode").value = sku;
+      document.getElementById("modalSkuCode").disabled = true;
+      document.getElementById("modalSkuCost").value = cost;
+      document.getElementById("modalSkuNote").value = note;
+      document.getElementById("skuModal").classList.remove("hidden");
+      document.getElementById("skuModal").classList.add("flex");
+      lucide.createIcons();
+    }
+
+    function closeSkuModal() {
+      document.getElementById("skuModal").classList.add("hidden");
+      document.getElementById("skuModal").classList.remove("flex");
+    }
+
+    async function saveSkuCostFromModal() {
+      const sku = document.getElementById("modalSkuCode").value.trim().toUpperCase();
+      const cost = parseFloat(document.getElementById("modalSkuCost").value);
+      const note = document.getElementById("modalSkuNote").value.trim();
+
+      if (!sku) return alert("กรุณากรอกรหัสสินค้า");
+      if (isNaN(cost) || cost < 0) return alert("กรุณากรอกราคาต้นทุนที่ถูกต้อง");
+
+      try {
+        const res = await fetch('/api/sku-costs', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ sku, cost, note })
+        });
+        const result = await res.json();
+        if (result.success) {
+          closeSkuModal();
+          showToast(`บันทึกต้นทุน ${sku} เรียบร้อยแล้ว`);
+          loadCostMasterTab();
+          loadCurrentReport();
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการบันทึก", true);
+      }
+    }
+
+    async function deleteSku(sku) {
+      if (!confirm(`คุณต้องการลบรหัส ${sku} ใช่หรือไม่?`)) return;
+      try {
+        const res = await fetch(`/api/sku-costs/${sku}`, { method: 'DELETE' });
+        const result = await res.json();
+        if (result.success) {
+          showToast(`ลบรหัส ${sku} สำเร็จ`);
+          loadCostMasterTab();
+        }
+      } catch (err) {
+        showToast("ไม่สามารถลบได้", true);
+      }
+    }
+
+    // ---------------- MODAL 1: SCAN PASTED TEXT ---------------- //
+    function openScanModal() {
+      document.getElementById("scanDate").value = document.getElementById("inputStartDate").value;
+      document.getElementById("scanChannel").value = currentChannel === 'kkc' ? 'kkc' : 'online';
+      document.getElementById("scanModal").classList.remove("hidden");
+      document.getElementById("scanModal").classList.add("flex");
+    }
+
+    function closeScanModal() {
+      document.getElementById("scanModal").classList.add("hidden");
+      document.getElementById("scanModal").classList.remove("flex");
+    }
+
+    async function executeScanOrders() {
+      const btn = document.getElementById("btnSubmitScan");
+      const fileInput = document.getElementById("scanJsonFile");
+      const channel = document.getElementById("scanChannel").value;
+      const date = document.getElementById("scanDate").value;
+      const rawText = document.getElementById("scanRawText").value;
+
+      btn.disabled = true;
+      btn.innerText = "กำลังประมวลผล...";
+
+      try {
+        // If file is selected
+        if (fileInput.files && fileInput.files[0]) {
+          const formData = new FormData();
+          formData.append("file", fileInput.files[0]);
+          formData.append("channel", channel);
+
+          const res = await fetch('/api/orders/upload-export', {
+            method: 'POST',
+            body: formData
+          });
+          const result = await res.json();
+          if (result.success) {
+            showToast(`นำเข้าสำเร็จ ${result.imported_orders} ออเดอร์ (ข้าม ${result.skipped_non_orders} ข้อความทั่วไป)`);
+            closeScanModal();
+            loadCurrentReport();
+          } else {
+            showToast(`เกิดข้อผิดพลาด: ${result.error}`, true);
+          }
+        } else {
+          // Paste text
+          if (!rawText.trim()) {
+            alert("กรุณาวางข้อความแชท หรือเลือกไฟล์ JSON");
+            btn.disabled = false;
+            btn.innerText = "สแกนและบันทึกออเดอร์";
+            return;
+          }
+          const res = await fetch('/api/orders/scan-text', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ text: rawText, channel, date })
+          });
+          const result = await res.json();
+          if (result.success) {
+            showToast(`สแกนสำเร็จ ${result.imported_orders} ออเดอร์!`);
+            closeScanModal();
+            document.getElementById("scanRawText").value = "";
+            loadCurrentReport();
+          } else {
+            showToast(`เกิดข้อผิดพลาด: ${result.error}`, true);
+          }
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการเชื่อมต่อ", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "สแกนและบันทึกออเดอร์";
+      }
+    }
+
+    // ---------------- MODAL 4: STOREFRONT ENTRY ---------------- //
+    function openStorefrontModal() {
+      document.getElementById("storefrontDate").value = document.getElementById("inputStartDate").value;
+      document.getElementById("storefrontSales").value = "";
+      document.getElementById("storefrontPieces").value = "";
+      document.getElementById("storefrontNote").value = "";
+      document.getElementById("storefrontModal").classList.remove("hidden");
+      document.getElementById("storefrontModal").classList.add("flex");
+    }
+
+    function closeStorefrontModal() {
+      document.getElementById("storefrontModal").classList.add("hidden");
+      document.getElementById("storefrontModal").classList.remove("flex");
+    }
+
+    async function saveStorefrontEntry() {
+      const date = document.getElementById("storefrontDate").value;
+      const sales = parseFloat(document.getElementById("storefrontSales").value);
+      const pieces = parseInt(document.getElementById("storefrontPieces").value);
+      const note = document.getElementById("storefrontNote").value.trim();
+
+      if (!date) return alert("กรุณาเลือกวันที่");
+      if (isNaN(sales) || sales < 0) return alert("กรุณาระบุยอดขาย (บาท)");
+      if (isNaN(pieces) || pieces < 0) return alert("กรุณาระบุจำนวนตัว");
+
+      try {
+        const res = await fetch('/api/storefront/daily-entry', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ date, sales, pieces, note })
+        });
+        const result = await res.json();
+        if (result.success) {
+          showToast(`บันทึกยอดขายหน้าร้าน KKC วันที่ ${date} เรียบร้อยแล้ว!`);
+          closeStorefrontModal();
+          loadCurrentReport();
+        } else {
+          showToast(`ข้อผิดพลาด: ${result.error}`, true);
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการเชื่อมต่อ", true);
+      }
+    }
+
+    // ---------------- MODAL 2: SYNC FB ADS ---------------- //
+    function syncFbAdsModal() {
+      document.getElementById("fbSinceDate").value = document.getElementById("inputStartDate").value;
+      document.getElementById("fbUntilDate").value = document.getElementById("inputEndDate").value;
+      document.getElementById("syncFbModal").classList.remove("hidden");
+      document.getElementById("syncFbModal").classList.add("flex");
+    }
+
+    function closeSyncFbModal() {
+      document.getElementById("syncFbModal").classList.add("hidden");
+      document.getElementById("syncFbModal").classList.remove("flex");
+    }
+
+    async function executeSyncFbAds() {
+      const btn = document.getElementById("btnSubmitSyncFb");
+      const since = document.getElementById("fbSinceDate").value;
+      const until = document.getElementById("fbUntilDate").value;
+
+      btn.disabled = true;
+      btn.innerText = "กำลังดึงข้อมูล Facebook...";
+
+      try {
+        const res = await fetch('/api/ads/sync', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ since_date: since, until_date: until })
+        });
+        const result = await res.json();
+        if (result.success) {
+          showToast(`ซิงค์ข้อมูล Ads สำเร็จ ${result.synced_days} วัน!`);
+          closeSyncFbModal();
+          loadCurrentReport();
+        } else {
+          showToast(`ข้อผิดพลาด Facebook: ${result.error}`, true);
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการเชื่อมต่อ Facebook API", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "เริ่มดึงข้อมูล Ads";
+      }
+    }
+
+    // ---------------- TAB 6: AUDIT & 3-WAY RECONCILIATION ---------------- //
+    let cachedAuditOrders = [];
+
+    async function loadAuditTab() {
+      const start = document.getElementById("inputStartDate").value;
+      const end = document.getElementById("inputEndDate").value;
+      const ch = currentChannel;
+
+      // 1. Reconcile Report (OneDrive vs System Chat Orders)
+      try {
+        const recRes = await fetch(`/api/onedrive/reconcile?start_date=${start}&end_date=${end}&channel=${ch}`);
+        const recData = await recRes.json();
+        renderReconcileTable(recData);
+      } catch (err) {
+        console.error("Failed to load reconcile data:", err);
+      }
+
+      // 2. Facebook Page Audit
+      try {
+        const res = await fetch('/api/audit?start_date=2026-08-01&end_date=2026-09-13');
+        const data = await res.json();
+        
+        // Update summary cards
+        document.getElementById("auditFbOrdersCount").innerText = `${data.summary.total_fb_page_orders} บิล`;
+        document.getElementById("auditFbSales").innerText = `฿${formatNumber(data.summary.total_fb_page_sales)}`;
+
+        cachedAuditOrders = data.fb_page_orders || [];
+        renderAuditTableRows(cachedAuditOrders);
+      } catch (err) {
+        console.error("Failed to load audit data:", err);
+      }
+    }
+
+    function renderReconcileTable(recData) {
+      if (!recData) return;
+      const subEl = document.getElementById("reconcileSubtitle");
+      if (subEl) {
+        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : 'งบรวม');
+        subEl.innerText = `เปรียบเทียบยอดขายรายวันระหว่างฐานข้อมูลแชทกับไฟล์ปิดวัน OneDrive • ช่วง: ${recData.date_range.start} ถึง ${recData.date_range.end} • ช่องทาง: ${chName}`;
+      }
+
+      document.getElementById("recSumSysSales").innerText = `฿${formatNumber(recData.totals.system_sales)}`;
+      document.getElementById("recSumOdSales").innerText = `฿${formatNumber(recData.totals.onedrive_sales)}`;
+      
+      const diffEl = document.getElementById("recSumDiffSales");
+      diffEl.innerText = `฿${formatNumber(recData.totals.diff_sales)}`;
+      if (Math.abs(recData.totals.diff_sales) < 0.01) {
+        diffEl.className = "text-base font-bold text-emerald-400 font-mono";
+      } else {
+        diffEl.className = "text-base font-bold text-rose-400 font-mono";
+      }
+
+      document.getElementById("recSumMatchDays").innerText = `${recData.totals.matched_days} / ${recData.totals.total_days} วัน`;
+
+      const tbody = document.getElementById("reconcileTableBody");
+      tbody.innerHTML = "";
+
+      if (!recData.rows || recData.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-4 text-center text-slate-500">ไม่มีข้อมูลเปรียบเทียบในช่วงวันที่นี้</td></tr>`;
+        return;
+      }
+
+      recData.rows.forEach(r => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/40 transition text-xs";
+
+        let statusBadge = "";
+        if (r.status === "MATCH") {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>✓ ตรงกัน 100%
+          </span>`;
+        } else if (r.status === "MISSING_ONEDRIVE") {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>รอรายงาน OneDrive
+          </span>`;
+        } else if (r.status === "MISSING_SYSTEM") {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>มีเฉพาะใน OneDrive
+          </span>`;
+        } else {
+          statusBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold border border-rose-500/30">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>⚠️ ส่วนต่าง ฿${formatNumber(r.diff_sales)}
+          </span>`;
+        }
+
+        const diffClass = Math.abs(r.diff_sales) < 0.01 ? "text-slate-500 font-mono" : "text-rose-400 font-bold font-mono";
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 font-mono font-medium text-white">${r.date}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-white">฿${formatNumber(r.system_sales)}</td>
+          <td class="py-2.5 px-3 text-center text-slate-300 font-mono">${r.system_orders} บิล / ${r.system_pieces} ตัว</td>
+          <td class="py-2.5 px-3 text-right font-mono font-semibold text-emerald-400">฿${formatNumber(r.onedrive_sales)}</td>
+          <td class="py-2.5 px-3 text-center text-slate-300 font-mono">${r.onedrive_orders} บิล / ${r.onedrive_pieces} ตัว</td>
+          <td class="py-2.5 px-3 text-right ${diffClass}">฿${formatNumber(r.diff_sales)}</td>
+          <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ---------------- MODAL 5: ONEDRIVE SYNC ---------------- //
+    function openOneDriveModal() {
+      document.getElementById("onedriveModal").classList.remove("hidden");
+      document.getElementById("onedriveModal").classList.add("flex");
+    }
+
+    function closeOneDriveModal() {
+      document.getElementById("onedriveModal").classList.add("hidden");
+      document.getElementById("onedriveModal").classList.remove("flex");
+    }
+
+    async function executePasteClosing() {
+      const btn = document.getElementById("btnSubmitPasteClosing");
+      const text = document.getElementById("onedrivePasteText").value.trim();
+      const channel = document.getElementById("onedrivePasteChannel").value;
+
+      if (!text) {
+        alert("กรุณาวางข้อความสรุปปิดวันจาก Excel ในช่องก่อนกดนำเข้า");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerText = "กำลังประมวลผล...";
+
+      try {
+        const res = await fetch('/api/onedrive/paste-text', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ text, channel })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`นำเข้าสำเร็จ ${data.imported_closings} วันจากข้อความปิดวัน!`);
+          document.getElementById("onedrivePasteText").value = "";
+          closeOneDriveModal();
+          loadCurrentReport();
+          loadAuditTab();
+        } else {
+          showToast(`ข้อผิดพลาด: ${data.error}`, true);
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการนำเข้าข้อความปิดวัน", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5"></i><span>นำเข้าข้อความปิดวันทันที</span>`;
+        lucide.createIcons();
+      }
+    }
+
+    async function executeSyncOneDrive() {
+      const btn = document.getElementById("btnSubmitOneDrive");
+      const url = document.getElementById("onedriveUrlInput").value.trim();
+      const channel = document.getElementById("onedriveChannelSelect").value;
+      const fileInput = document.getElementById("onedriveLocalFile");
+
+      btn.disabled = true;
+      btn.innerText = "กำลังประมวลผล...";
+
+      try {
+        if (fileInput.files && fileInput.files[0]) {
+          const formData = new FormData();
+          formData.append("file", fileInput.files[0]);
+          formData.append("channel", channel);
+
+          const res = await fetch('/api/onedrive/upload', {
+            method: 'POST',
+            body: formData
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(`นำเข้าสำเร็จ ${data.imported_closings} วันจากไฟล์ปิดวัน!`);
+            closeOneDriveModal();
+            loadCurrentReport();
+            loadAuditTab();
+          } else {
+            showToast(`ข้อผิดพลาด: ${data.error}`, true);
+          }
+        } else if (url) {
+          const res = await fetch('/api/onedrive/sync-link', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url, channel })
+          });
+          const data = await res.json();
+          if (data.success) {
+            showToast(`ดึงและนำเข้าสำเร็จ ${data.imported_closings} วันจาก OneDrive Link!`);
+            closeOneDriveModal();
+            loadCurrentReport();
+            loadAuditTab();
+          } else {
+            showToast(`ข้อผิดพลาด: ${data.error}`, true);
+          }
+        } else {
+          alert("กรุณาวางข้อความในช่องด้านบน หรือวาง OneDrive Share Link หรือเลือกไฟล์ Excel/CSV");
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการเชื่อมต่อ OneDrive", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "ดึงข้อมูลจากลิงก์/ไฟล์";
+      }
+    }
+
+    // ---------------- MODAL 6: TELEGRAM HUB ---------------- //
+    function openTelegramModal() {
+      document.getElementById("telegramModal").classList.remove("hidden");
+      document.getElementById("telegramModal").classList.add("flex");
+      checkTelegramStatus();
+      checkTelegramBotStatus();
+    }
+
+    function closeTelegramModal() {
+      document.getElementById("telegramModal").classList.add("hidden");
+      document.getElementById("telegramModal").classList.remove("flex");
+    }
+
+    async function checkTelegramStatus() {
+      try {
+        const res = await fetch('/api/telegram/status');
+        const data = await res.json();
+        const dot = document.getElementById("tgStatusDot");
+        const txt = document.getElementById("tgStatusText");
+        const loginSec = document.getElementById("tgLoginSection");
+        const syncSec = document.getElementById("tgSyncSection");
+        const pendingBanner = document.getElementById("tgPendingOtpBanner");
+        const codeGroup = document.getElementById("tgCodeGroup");
+
+        if (data.authorized && data.user) {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+          txt.innerText = `เข้าสู่ระบบแล้ว: ${data.user.first_name || ''} (@${data.user.username || data.user.phone || 'User'})`;
+          loginSec.classList.add("hidden");
+          if (pendingBanner) pendingBanner.classList.add("hidden");
+          syncSec.classList.remove("hidden");
+          loadTelegramDialogs();
+        } else {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-amber-400";
+          txt.innerText = "ยังไม่ได้เข้าสู่ระบบ Telegram (กรุณาใช้เบอร์โทรรับ OTP)";
+          loginSec.classList.remove("hidden");
+          syncSec.classList.add("hidden");
+
+          if (data.has_pending_otp) {
+            if (pendingBanner) {
+              pendingBanner.classList.remove("hidden");
+              const phoneStr = data.phone || document.getElementById("tgPhoneInput").value || "เบอร์ของคุณ";
+              document.getElementById("tgPendingOtpTitle").innerText = `รหัส OTP ถูกส่งไปยังแอป Telegram ของเบอร์ ${phoneStr} แล้ว`;
+            }
+            if (codeGroup) codeGroup.classList.remove("hidden");
+            if (data.phone && !document.getElementById("tgPhoneInput").value) {
+              document.getElementById("tgPhoneInput").value = data.phone;
+            }
+          }
+        }
+      } catch (err) {
+        console.error("TG status check error:", err);
+      }
+    }
+
+    async function requestTelegramOtp() {
+      let phone = document.getElementById("tgPhoneInput").value.trim();
+      if (!phone) return alert("กรุณาระบุเบอร์โทรศัพท์ (เช่น 0830789329 หรือ +66830789329)");
+      
+      const btn = document.getElementById("btnSendOtp");
+      btn.disabled = true;
+      btn.innerText = "กำลังส่ง...";
+
+      try {
+        const res = await fetch('/api/telegram/login/phone', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ phone })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`ส่ง OTP เรียบร้อยแล้วที่เบอร์ ${data.phone || phone} กรุณาเปิดดูในแอป Telegram`);
+          const banner = document.getElementById("tgPendingOtpBanner");
+          if (banner) {
+            banner.classList.remove("hidden");
+            document.getElementById("tgPendingOtpTitle").innerText = `รหัส OTP ถูกส่งไปยังแอป Telegram ของเบอร์ ${data.phone || phone} แล้ว`;
+          }
+          document.getElementById("tgCodeGroup").classList.remove("hidden");
+        } else {
+          showToast(`ข้อผิดพลาด: ${data.error}`, true);
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการส่ง OTP", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "ส่ง OTP";
+      }
+    }
+
+    async function verifyTelegramOtp() {
+      const code = document.getElementById("tgOtpInput").value.trim();
+      const password = document.getElementById("tgPasswordInput").value.trim();
+      if (!code) return alert("กรุณาระบุรหัส OTP");
+
+      const btn = document.getElementById("btnVerifyOtp");
+      btn.disabled = true;
+      btn.innerText = "กำลังยืนยัน...";
+
+      try {
+        const res = await fetch('/api/telegram/login/code', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ code, password })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast("เข้าสู่ระบบ Telegram สำเร็จเรียบร้อย!");
+          checkTelegramStatus();
+        } else if (data.requires_password) {
+          alert("บัญชีนี้เปิดใช้งาน 2FA กรุณากรอกรหัสผ่าน 2-Step Verification ในช่องรหัส 2FA");
+        } else {
+          showToast(`รหัส OTP ไม่ถูกต้อง: ${data.error}`, true);
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการตรวจสอบ OTP", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "ยืนยันรหัส";
+      }
+    }
+
+    async function loadTelegramDialogs() {
+      const sel = document.getElementById("tgDialogsSelect");
+      sel.innerHTML = `<option value="">-- กำลังโหลดรายชื่อกลุ่ม... --</option>`;
+      try {
+        const res = await fetch('/api/telegram/dialogs');
+        const data = await res.json();
+        if (data.dialogs && data.dialogs.length > 0) {
+          sel.innerHTML = "";
+          data.dialogs.forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d.id;
+            opt.innerText = `[${d.type}] ${d.title} (ID: ${d.id})`;
+            sel.appendChild(opt);
+          });
+        } else {
+          sel.innerHTML = `<option value="">ไม่พบกลุ่มหรือแชท (หรือกำลังเชื่อมต่อ)</option>`;
+        }
+      } catch (err) {
+        sel.innerHTML = `<option value="">โหลดกลุ่มไม่สำเร็จ</option>`;
+      }
+    }
+
+    async function executeTelegramGroupSync() {
+      const sel = document.getElementById("tgDialogsSelect");
+      const chatId = sel.value;
+      const channel = document.getElementById("tgSyncTargetChannel").value;
+      const sinceDate = document.getElementById("tgSinceDate").value;
+
+      if (!chatId) return alert("กรุณาเลือกกลุ่ม Telegram ที่ต้องการดึง");
+
+      const btn = document.getElementById("btnExecuteTgSync");
+      btn.disabled = true;
+      btn.innerText = "กำลังดึงออเดอร์จาก Telegram...";
+
+      try {
+        const res = await fetch('/api/telegram/sync', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ chat_id: chatId, channel, since_date: sinceDate })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(`ดึงและบันทึกสำเร็จ ${data.imported_orders} ออเดอร์ (ข้ามข้อความทั่วไป ${data.skipped_messages})`);
+          closeTelegramModal();
+          loadCurrentReport();
+        } else {
+          showToast(`ข้อผิดพลาด Telegram: ${data.error}`, true);
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการดึงข้อมูล Telegram", true);
+      } finally {
+        btn.disabled = false;
+        btn.innerText = "เริ่มดึงออเดอร์จากกลุ่มที่เลือก";
+      }
+    }
+
+    function renderAuditTableRows(orders) {
+      const tbody = document.getElementById("auditTableBody");
+      tbody.innerHTML = "";
+
+      orders.forEach(o => {
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-slate-800/40 transition text-xs";
+
+        const paymentBadge = o.payment_method === "ปลายทาง"
+          ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">ปลายทาง</span>`
+          : `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">โอน</span>`;
+
+        const adminBadge = `<span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold font-mono border border-indigo-500/30">${o.sender_name || 'mew'}</span>`;
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-slate-400 font-mono">${o.message_id ? o.message_id.replace('fb_', '') : '#' + o.id}</td>
+          <td class="py-2.5 px-3 text-slate-300 font-mono">${o.order_date}<br><span class="text-[10px] text-slate-500">${o.order_time ? o.order_time.slice(11) : ''}</span></td>
+          <td class="py-2.5 px-3 font-medium text-white">${o.customer_name || 'ลูกค้าเพจ'}<br><span class="text-[11px] text-slate-400 font-mono">${o.phone || '-'}</span></td>
+          <td class="py-2.5 px-3 font-mono text-indigo-300">${o.raw_text ? o.raw_text.split('รหัส ')[1] || o.raw_text : '-'}</td>
+          <td class="py-2.5 px-3 text-center">${paymentBadge}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-white">฿${formatNumber(o.total_sales)}</td>
+          <td class="py-2.5 px-3">${adminBadge}</td>
+          <td class="py-2.5 px-3">
+            <span class="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              <span>ออเดอร์สุดท้ายเพจ (ไม่ซ้ำคน)</span>
+            </span>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function filterAuditTable() {
+      const q = document.getElementById("auditSearchInput").value.toUpperCase();
+      const filtered = cachedAuditOrders.filter(o => 
+        (o.customer_name && o.customer_name.toUpperCase().includes(q)) ||
+        (o.phone && o.phone.includes(q)) ||
+        (o.sender_name && o.sender_name.toUpperCase().includes(q)) ||
+        (o.raw_text && o.raw_text.toUpperCase().includes(q))
+      );
+      renderAuditTableRows(filtered);
+    }
+
+    async function checkTelegramBotStatus() {
+      const dot = document.getElementById("tgBotStatusDot");
+      const nameTxt = document.getElementById("tgBotNameText");
+      const notice = document.getElementById("tgBotAdminNotice");
+      const input = document.getElementById("modalTgBotToken");
+
+      try {
+        const res = await fetch('/api/telegram/bot-check');
+        const data = await res.json();
+
+        if (data.configured && data.valid) {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-400";
+          nameTxt.innerText = `บอทออนไลน์: @${data.bot_username}`;
+          if (!input.value) input.value = "8582637848:AAHveDb0YSY3sDKm8V-m3HwDV8Ute8GsgX8";
+
+          if (data.can_read_all_group_messages) {
+            notice.className = "text-[11px] leading-relaxed p-2 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-200";
+            notice.innerHTML = `✅ <b>สิทธิ์การอ่านแชทสมบูรณ์:</b> บอทได้รับสิทธิ์อ่านทุกข้อความในกลุ่มแล้ว พร้อมดูดยอดและคำนวณกำไรอัตโนมัติ`;
+          } else {
+            notice.className = "text-[11px] leading-relaxed p-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-200";
+            notice.innerHTML = `⚠️ <b>ข้อสำคัญเพื่อให้บอทอ่านยอดขายได้:</b><br>
+            เนื่องจาก Telegram มีระบบ Privacy ป้องกันบอทแอบอ่านแชททั่วไป คุณต้อง <b>ตั้งบอท @${data.bot_username} ให้เป็น 'ผู้ดูแลกลุ่ม' (Admin)</b> ในกลุ่มหน้าร้านขอนแก่น (Jeans around kkc) หรือส่ง <code class="bg-black/40 px-1 py-0.5 rounded">/setprivacy -> Disable</code> ให้ @BotFather บอทจึงจะอ่านออเดอร์ของพนักงานได้อัตโนมัติ`;
+          }
+        } else {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+          nameTxt.innerText = data.configured ? `บอทไม่ถูกต้อง: ${data.message || ''}` : "ยังไม่ได้ระบุ Bot Token";
+          notice.className = "text-[11px] leading-relaxed p-2 rounded bg-slate-800 text-slate-400";
+          notice.innerHTML = `กรุณาวาง Bot Token จาก @BotFather เพื่อเริ่มต้นระบบดูดยอดอัตโนมัติ`;
+        }
+      } catch (err) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+        nameTxt.innerText = "ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์บอทได้";
+      }
+    }
+
+    async function saveModalTgBotToken() {
+      const token = document.getElementById("modalTgBotToken").value.trim();
+      if (!token) return alert("กรุณากรอก Telegram Bot Token");
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ settings: { TELEGRAM_BOT_TOKEN: token } })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast("บันทึก Telegram Bot Token สำเร็จแล้ว! กำลังตรวจสอบสถานะบอท...");
+          checkTelegramBotStatus();
+          loadSettings();
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการบันทึก Token", true);
+      }
+    }
+
+    // ---------------- TAB 6: SETTINGS ---------------- //
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/settings');
+        const data = await res.json();
+        const s = data.settings;
+
+        document.getElementById("settingOnlineLabor").value = s.ONLINE_LABOR_DAILY || "1132";
+        document.getElementById("settingOnlineComm").value = s.ONLINE_COMMISSION_PER_PIECE || "10";
+        document.getElementById("settingOnlineMisc").value = s.ONLINE_MISC_PER_ORDER || "3";
+        document.getElementById("settingOnlineCodFee").value = s.ONLINE_COD_FEE_PCT || "2.14";
+
+        document.getElementById("settingKkcRent").value = s.KKC_RENT_DAILY || "910.00";
+        document.getElementById("settingKkcLaborWeekday").value = s.KKC_LABOR_WEEKDAY || "460";
+        document.getElementById("settingKkcLaborWeekend").value = s.KKC_LABOR_WEEKEND || "500";
+        document.getElementById("settingKkcMisc").value = s.KKC_MISC_PER_ORDER || "6";
+
+        document.getElementById("settingFbAdAccount").value = s.AD_ACCOUNT_ID || "act_703804833399837";
+        document.getElementById("settingTelegramToken").value = s.TELEGRAM_BOT_TOKEN || "";
+        const mToken = document.getElementById("modalTgBotToken");
+        if (mToken) mToken.value = s.TELEGRAM_BOT_TOKEN || "";
+        document.getElementById("settingTelegramOnlineId").value = s.TELEGRAM_ONLINE_CHAT_ID || "";
+        document.getElementById("settingTelegramKkcId").value = s.TELEGRAM_KKC_CHAT_ID || "";
+      } catch (err) {
+        console.error("Failed to load settings:", err);
+      }
+    }
+
+    async function saveAllSettings() {
+      const payload = {
+        ONLINE_LABOR_DAILY: document.getElementById("settingOnlineLabor").value,
+        ONLINE_COMMISSION_PER_PIECE: document.getElementById("settingOnlineComm").value,
+        ONLINE_MISC_PER_ORDER: document.getElementById("settingOnlineMisc").value,
+        ONLINE_COD_FEE_PCT: document.getElementById("settingOnlineCodFee").value,
+
+        KKC_RENT_DAILY: document.getElementById("settingKkcRent").value,
+        KKC_LABOR_WEEKDAY: document.getElementById("settingKkcLaborWeekday").value,
+        KKC_LABOR_WEEKEND: document.getElementById("settingKkcLaborWeekend").value,
+        KKC_MISC_PER_ORDER: document.getElementById("settingKkcMisc").value,
+
+        AD_ACCOUNT_ID: document.getElementById("settingFbAdAccount").value,
+        TELEGRAM_BOT_TOKEN: document.getElementById("settingTelegramToken").value,
+        TELEGRAM_ONLINE_CHAT_ID: document.getElementById("settingTelegramOnlineId").value,
+        TELEGRAM_KKC_CHAT_ID: document.getElementById("settingTelegramKkcId").value
+      };
+
+      try {
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ settings: payload })
+        });
+        const result = await res.json();
+        if (result.success) {
+          showToast("บันทึกการตั้งค่าทั้งหมดเรียบร้อยแล้ว");
+          loadCurrentReport();
+        }
+      } catch (err) {
+        showToast("เกิดข้อผิดพลาดในการบันทึก", true);
+      }
+    }
+  </script>
+</body>
+</html>
