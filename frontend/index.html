@@ -1177,8 +1177,14 @@ xrp55 2 ตัว
         btn.textContent = label;
         chips.appendChild(btn);
       }
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.className = "preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition";
+      });
+      const tb = document.getElementById("preset-today");
+      if (tb) tb.className = "preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition";
       updateActivePeriodBadge();
     }
+
 
 
     function showToast(msg, isError = false) {
@@ -1256,25 +1262,27 @@ xrp55 2 ตัว
         c.className = "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
       });
 
-      let start = new Date(2026, 8, 1);
-      let end = new Date(2026, 8, 12);
+      const now = new Date();
+      let start = new Date(now.getFullYear(), now.getMonth(), 1);
+      let end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
       if (preset === 'today') {
-        start = new Date(2026, 8, 12);
-        end = new Date(2026, 8, 12);
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       } else if (preset === 'yesterday') {
-        start = new Date(2026, 8, 11);
-        end = new Date(2026, 8, 11);
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       } else if (preset === '7d') {
-        start = new Date(2026, 8, 6);
-        end = new Date(2026, 8, 12);
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       } else if (preset === 'sep') {
-        start = new Date(2026, 8, 1);
-        end = new Date(); // today
+        start = new Date(now.getFullYear(), 8, 1);
+        end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       } else if (preset === 'aug') {
-        start = new Date(2026, 7, 1);
-        end = new Date(2026, 7, 31);
+        start = new Date(now.getFullYear(), 7, 1);
+        end = new Date(now.getFullYear(), 7, 31);
       }
+
 
       const formatDate = (d) => {
         const year = d.getFullYear();

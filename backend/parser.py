@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from datetime import datetime
 from typing import Dict, List, Any, Optional
 
 def normalize_sku(raw_sku: str) -> str:
@@ -34,73 +35,84 @@ def extract_admin_name(text: str, default_sender: str = "") -> str:
 
 
 def extract_payment_and_amount(text: str) -> Dict[str, Any]:
-    """Determine payment method and total amount paid/cod"""
-    is_cod = bool(re.search(r"(ปลายทาง|เก็บปลายทาง|cod|เก็บเงินปลายทาง|ปลาย\s*ทาง)", text, re.IGNORECASE))
-    is_cash = bool(re.search(r"(เงินสด|สด|cash)", text, re.IGNORECASE))
-    
-    payment_method = "ปลายทาง" if is_cod else ("เงินสด" if is_cash else "โอน")
+    """Determine payment method and total amount paid/cod accurately"""
+    cod_amount = 0.0
+    transfer_amount = 0.0
+    cash_amount = 0.0
 
-    # Extract amount — try each payment keyword in order with flexible spacing
-    amount = 0.0
-
-    # Priority 1: Explicit marker like 'ปลายทาง : 1290', 'โอน :1,180', 'ยอด 490'
-    p1 = re.search(
-        r"(?:โอน|ปลายทาง|ยอด|ยอดโอน|รวม|ราคา|บิล|เงินสด|สด)"
-        r"\s*[:=]?\s*([0-9,]+(?:\.\d{1,2})?)\s*(?:บาท|.-|b|baht)?",
-        text, re.IGNORECASE
-    )
-    if p1:
+    # 1. Check COD explicitly: 'ปลายทาง : 1290', 'ปลายทาง 1290', 'ปลายทาง :  1290'
+    m_cod = re.search(r'(?:ปลายทาง|เก็บปลายทาง|cod|เก็บเงินปลายทาง)\s*[:=]?\s*([0-9,]+(?:\.\d{1,2})?)', text, re.IGNORECASE)
+    if m_cod:
         try:
-            val_str = p1.group(1).replace(",", "")
-            val = float(val_str)
+            val = float(m_cod.group(1).replace(",", ""))
             if 50 <= val <= 100000:
-                amount = val
+                cod_amount = val
         except ValueError:
             pass
 
-    # Priority 1b: If amount still 0, look line-by-line for "ปลายทาง : 1290" or "โอน : 1290"
-    if amount == 0.0:
-        for line in text.splitlines():
-            line = line.strip()
-            m = re.match(
-                r"(?:ปลายทาง|โอน|ยอด|รวม|ราคา)\s*:\s*([0-9,]+(?:\.\d{1,2})?)",
-                line, re.IGNORECASE
-            )
-            if m:
-                try:
-                    val = float(m.group(1).replace(",", ""))
-                    if 50 <= val <= 100000:
-                        amount = val
-                        # Also update payment_method based on which keyword matched
-                        if "ปลายทาง" in line:
-                            payment_method = "ปลายทาง"
-                            is_cod = True
-                        break
-                except ValueError:
-                    pass
+    # 2. Check Transfer explicitly: 'โอน : 1290', 'โอน 1290'
+    m_tr = re.search(r'(?:โอน|ยอดโอน)\s*[:=]?\s*([0-9,]+(?:\.\d{1,2})?)', text, re.IGNORECASE)
+    if m_tr:
+        try:
+            val = float(m_tr.group(1).replace(",", ""))
+            if 50 <= val <= 100000:
+                transfer_amount = val
+        except ValueError:
+            pass
 
-    # Priority 2: Any price-like number in text (e.g. 590, 690, 890, 1180, 1500)
-    if amount == 0.0:
-        prices = re.findall(r"\b([1-9]\d{2,4})\b", text)
-        for p in reversed(prices):
-            try:
-                val = float(p)
-                # Ignore common postcodes or year like 2024, 2025, 2026, 10110, etc.
-                if 190 <= val <= 20000 and val not in [2024, 2025, 2026]:
-                    amount = val
-                    break
-            except ValueError:
-                pass
+    # 3. Check Cash explicitly: 'เงินสด : 1200', 'สด 1200'
+    m_cash = re.search(r'(?:เงินสด|สด|cash)\s*[:=]?\s*([0-9,]+(?:\.\d{1,2})?)', text, re.IGNORECASE)
+    if m_cash:
+        try:
+            val = float(m_cash.group(1).replace(",", ""))
+            if 50 <= val <= 100000:
+                cash_amount = val
+        except ValueError:
+            pass
 
-    cod_amount = amount if payment_method == "ปลายทาง" else 0.0
-    transfer_amount = amount if payment_method != "ปลายทาง" else 0.0
+    if cod_amount > 0:
+        return {
+            "payment_method": "ปลายทาง",
+            "total_sales": cod_amount,
+            "cod_amount": cod_amount,
+            "transfer_amount": 0.0
+        }
+    elif transfer_amount > 0:
+        return {
+            "payment_method": "โอน",
+            "total_sales": transfer_amount,
+            "cod_amount": 0.0,
+            "transfer_amount": transfer_amount
+        }
+    elif cash_amount > 0:
+        return {
+            "payment_method": "เงินสด",
+            "total_sales": cash_amount,
+            "cod_amount": 0.0,
+            "transfer_amount": 0.0
+        }
 
+    # Fallback to general price
+    p_gen = re.findall(r"\b([1-9]\d{2,4})\b", text)
+    amount = 0.0
+    for p in reversed(p_gen):
+        try:
+            val = float(p)
+            if 190 <= val <= 20000 and val not in [2024, 2025, 2026]:
+                amount = val
+                break
+        except ValueError:
+            pass
+
+    is_cod = bool(re.search(r"(ปลายทาง|เก็บปลายทาง|cod)", text, re.IGNORECASE))
+    method = "ปลายทาง" if is_cod else "โอน"
     return {
-        "payment_method": payment_method,
+        "payment_method": method,
         "total_sales": amount,
-        "cod_amount": cod_amount,
-        "transfer_amount": transfer_amount
+        "cod_amount": amount if method == "ปลายทาง" else 0.0,
+        "transfer_amount": amount if method != "ปลายทาง" else 0.0
     }
+
 
 
 
@@ -153,7 +165,7 @@ def parse_order_items(text: str, sku_cost_map: Dict[str, float]) -> List[Dict[st
 
         # Quantity in this segment
         qty = 1
-        qty_match = re.search(r"(\d+)\s*(?:ตัว|ชิ้น|ea|pcs)", segment)
+        qty_match = re.search(r"(\d+)\s*(?:ตัว|ชิ้น|ea|pcs|สี)", segment)
         if not qty_match:
             qty_match = re.search(r"(?:=|\*|x)\s*(\d+)", segment)
         if qty_match:
@@ -292,8 +304,15 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
     เงินสด : 1100
     """
     t = text.strip()
-    if not ("รหัส" in t and ("โอน" in t or "เงินสด" in t)):
+    # Reject if it looks like an online order
+    if any(k in t for k in ["สรุปออเดอร์", "ปลายทาง", "facebook", "admin :", "เพจ :", "ที่อยู่ :", "รหัส :1", "รหัส :2", "รหัส :3", "รหัส :4", "รหัส :5", "รหัส :6", "รหัส :7", "รหัส :8", "รหัส :9"]):
         return None
+
+    # Must contain storefront indicators
+    is_storefront = ("รหัสสินค้า" in t) or ("ไซส์" in t and ("ลูกค้า" in t or "หน้าร้าน" in t))
+    if not is_storefront or not ("โอน" in t or "เงินสด" in t):
+        return None
+
 
     # Date extraction (e.g. 12/9/69 -> 2026-09-12)
     m_d = re.search(r'วันที่\s*[:=]?\s*(\d{1,2})[\s\-_/]+(\d{1,2})[\s\-_/]+(\d{2,4})', t)
@@ -405,15 +424,17 @@ def parse_order_message(
     if not text or not text.strip():
         return None
 
-    # 1. Check if structured staff order format
-    structured = parse_structured_storefront_order(text, sku_cost_map, order_date)
-    if structured:
-        structured["message_id"] = message_id
-        if sender_name:
-            structured["sender_name"] = sender_name
-        if source_channel:
-            structured["source_channel"] = source_channel
-        return structured
+    # 1. Check if structured staff storefront order format (only for storefront kkc or storefront text)
+    if source_channel == "kkc" or ("ลูกค้า" in text and ("รหัสสินค้า" in text or "หน้าร้าน" in text)):
+        structured = parse_structured_storefront_order(text, sku_cost_map, order_date)
+        if structured:
+            structured["message_id"] = message_id
+            if sender_name:
+                structured["sender_name"] = sender_name
+            if source_channel:
+                structured["source_channel"] = source_channel
+            return structured
+
 
     items = parse_order_items(text, sku_cost_map)
     if not items:
