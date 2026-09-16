@@ -3,7 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Jeans Around - Finance OS & Telegram Profit Analyzer</title>
+
   
   <!-- Tailwind CSS & Fonts -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -269,8 +273,9 @@
               <i data-lucide="file-spreadsheet" class="w-5 h-5 text-indigo-400"></i>
               <span>งบกำไรขาดทุนละเอียด (Profit & Loss Statement)</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5" id="pnlPeriodSubtitle">ช่วงวันที่ 2026-09-01 ถึง 2026-09-12 (12 วัน)</p>
+            <p class="text-xs text-slate-400 mt-0.5" id="pnlPeriodSubtitle">กำลังโหลดข้อมูลช่วงเวลา...</p>
           </div>
+
           <div class="flex items-center gap-2 text-xs">
             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
               <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
@@ -1291,11 +1296,23 @@ xrp55 2 ตัว
         return `${year}-${month}-${day}`;
       };
 
-      document.getElementById("inputStartDate").value = formatDate(start);
-      document.getElementById("inputEndDate").value = formatDate(end);
+      const sFormatted = formatDate(start);
+      const eFormatted = formatDate(end);
+      document.getElementById("inputStartDate").value = sFormatted;
+      document.getElementById("inputEndDate").value = eFormatted;
+
+      if (sFormatted === eFormatted) {
+        document.querySelectorAll('.day-chip').forEach(c => {
+          if (c.getAttribute('data-date') === sFormatted) {
+            c.className = "day-chip px-2 py-0.5 rounded text-white bg-indigo-600 border border-indigo-500 font-bold shadow-sm transition";
+          }
+        });
+      }
+
       updateActivePeriodBadge();
       loadCurrentReport();
     }
+
 
     function selectSingleDay(dateStr) {
       document.querySelectorAll('.preset-btn').forEach(b => {
