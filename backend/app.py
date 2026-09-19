@@ -276,6 +276,35 @@ def get_orders_list(
     }
 
 
+class OrderUpdateRequest(BaseModel):
+    order_date: Optional[str] = None
+    total_sales: Optional[float] = None
+    total_pieces: Optional[int] = None
+    payment_method: Optional[str] = None
+    cod_amount: Optional[float] = None
+    transfer_amount: Optional[float] = None
+    source_channel: Optional[str] = None
+
+
+@app.patch("/api/orders/{order_id}")
+def update_order_by_id(order_id: int, req: OrderUpdateRequest):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    updates = []
+    params = []
+    for k, v in req.dict(exclude_unset=True).items():
+        if v is not None:
+            updates.append(f"{k} = ?")
+            params.append(v)
+    if updates:
+        params.append(order_id)
+        cur.execute(f"UPDATE orders SET {', '.join(updates)} WHERE id = ?", params)
+        conn.commit()
+    conn.close()
+    return {"success": True, "order_id": order_id}
+
+
+
 @app.post("/api/storefront/daily-entry")
 def record_storefront_daily_entry(req: StorefrontDailyEntry):
     """Record daily sales and pieces for Central Khon Kaen Storefront"""

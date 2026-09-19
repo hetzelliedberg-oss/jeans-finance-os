@@ -321,9 +321,20 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
         d, m, y = int(m_d.group(1)), int(m_d.group(2)), int(m_d.group(3))
         if y < 100:
             y = 2000 + (y - 43) if y >= 50 else 2000 + y
-        date_str = f"{y:04d}-{m:02d}-{d:02d}"
+        parsed_dt = f"{y:04d}-{m:02d}-{d:02d}"
+        if default_date:
+            try:
+                dt_parsed = datetime.strptime(parsed_dt, "%Y-%m-%d")
+                dt_default = datetime.strptime(default_date, "%Y-%m-%d")
+                if abs((dt_parsed - dt_default).days) > 2:
+                    # Typo in text date (e.g. typed 8/9 instead of 19/9) -> fallback to message date!
+                    parsed_dt = default_date
+            except Exception:
+                parsed_dt = default_date
+        date_str = parsed_dt
     elif default_date:
         date_str = default_date
+
 
     # Transfer amount
     m_tr = re.search(r'โอน\s*[:=]?\s*([0-9,]+(?:\.\d{1,2})?)', t)
