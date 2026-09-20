@@ -360,8 +360,8 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
     if not sku_line:
         return None
 
-    raw_skus = [s.strip() for s in re.split(r'[/]\s*(?=[A-Za-z0-9ก-๙])', sku_line) if s.strip()]
-    raw_sizes = [s.strip() for s in re.split(r'[/]\s*', sz_line) if s.strip()]
+    raw_skus = [s.strip() for s in re.split(r'[/+]\s*|,\s*(?=(?:AR|XRP|[A-Za-z]{2,})\d+)', sku_line, flags=re.IGNORECASE) if s.strip()]
+    raw_sizes = [s.strip() for s in re.split(r'[/,]\s*', sz_line) if s.strip()]
 
     items = []
     for idx, s in enumerate(raw_skus):
@@ -369,7 +369,7 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
         color = ""
         sku_clean = s
         if "," in s:
-            parts = s.split(",")
+            parts = s.split(",", 1)
             sku_clean = parts[0].strip()
             color = parts[1].strip()
         sku_norm = normalize_sku(sku_clean)
