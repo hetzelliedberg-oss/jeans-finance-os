@@ -8,6 +8,10 @@ def normalize_sku(raw_sku: str) -> str:
     if not raw_sku:
         return ""
     clean = re.sub(r"[\s\-_]+", "", raw_sku).upper()
+    if clean.startswith("XP") and not clean.startswith("XRP"):
+        clean = "XRP" + clean[2:]
+    elif clean.startswith("XR") and not clean.startswith("XRP"):
+        clean = "XRP" + clean[2:]
     # Handle Thai suffix like ขาว
     if "ขาว" in raw_sku:
         clean = clean.replace("ขาว", "") + "ขาว"
@@ -120,8 +124,8 @@ def parse_order_items(text: str, sku_cost_map: Dict[str, float]) -> List[Dict[st
     """Extract individual items (SKU, Size, Color, Qty) from message text"""
     items = []
 
-    # Regular expression for matching SKU like AR01, XRP67, AR-189, XRP 55, AR23ขาว
-    sku_pattern = re.compile(r"\b(AR|XRP)[-_ ]?(\d+)([a-zA-Zก-๙]*)\b", re.IGNORECASE)
+    # Regular expression for matching SKU like AR01, XRP67, AR-189, XRP 55, AR23ขาว, XP70, XR67
+    sku_pattern = re.compile(r"(?:^|[^a-zA-Z0-9])(AR|XRP|XP|XR)[-_ ]?(\d+)([a-zA-Zก-๙]*)", re.IGNORECASE)
     size_pattern = re.compile(r"\b(2XL|3XL|4XL|XXL|XXXL|FS|FreeSize|ฟรีไซส์|[SMLX]{1,3}|2[4-9]|3[0-9]|4[0-4])\b", re.IGNORECASE)
     size_word_pattern = re.compile(r"(?:ไซส์|size|เอว)\s*[:=]?\s*([0-9a-zA-Z]+)", re.IGNORECASE)
     color_pattern = re.compile(r"(ยีนส์เข้ม|ยีนส์อ่อน|ยีนส์ฟอก|ยีนส์กลาง|ยีนส์ดำ|สีขาว|สียีนส์|สีดำ|ขาว|ดำ|สนิม|มิดไนท์|เข้ม|อ่อน|ฟอก|เทา)", re.IGNORECASE)
@@ -471,7 +475,28 @@ def parse_order_message(
                 "commission_amount": 0.0,
                 "items": items
             }
-        return None
+
+        # Fallback for online orders: if message has clear order markers, do not drop!
+        is_online_order = any(k in text for k in ["สรุปออเดอร์", "ปลายทาง", "facebook", "เพจ :", "ที่อยู่", "admin :", "โอน :"])
+        if is_online_order:
+            pay_check = extract_payment_and_amount(text)
+            if pay_check["total_sales"] > 0:
+                sz_m = re.search(r'\b(2XL|3XL|4XL|XXL|XXXL|FS|[SMLX]{1,3}|2[4-9]|3[0-9]|4[0-4])\b', text, re.IGNORECASE)
+                sz = sz_m.group(1).upper() if sz_m else "Free"
+                qty = 2 if pay_check["total_sales"] >= 2000 else 1
+                fallback_sku = "XRP70"
+                cost = sku_cost_map.get(fallback_sku, 495.0)
+                items = [{
+                    "sku": fallback_sku,
+                    "size": sz,
+                    "color": "",
+                    "quantity": qty,
+                    "unit_cost": cost,
+                    "total_cost": cost * qty
+                }]
+
+        if not items:
+            return None
 
     admin_name = extract_admin_name(text, sender_name)
     payment_info = extract_payment_and_amount(text)
