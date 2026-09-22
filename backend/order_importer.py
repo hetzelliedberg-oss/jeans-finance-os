@@ -8,14 +8,14 @@ from backend.database import get_db_connection, get_sku_cost_map
 from backend.parser import parse_order_message, normalize_sku
 
 
-def save_order_to_db(order_data: Dict[str, Any]) -> Optional[int]:
+def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) -> Any:
     """
     Save parsed order and its items to SQLite database.
     Prevents duplicates using (source_channel, message_id) if message_id exists.
-    Returns inserted order ID or None.
+    Returns inserted order ID or (order_id, is_new) if return_is_new is True.
     """
     if not order_data:
-        return None
+        return (None, False) if return_is_new else None
 
     conn = get_db_connection()
     cur = conn.cursor()
@@ -32,7 +32,7 @@ def save_order_to_db(order_data: Dict[str, Any]) -> Optional[int]:
         existing = cur.fetchone()
         if existing:
             conn.close()
-            return existing["id"]
+            return (existing["id"], False) if return_is_new else existing["id"]
 
     # Check duplicate by identical order text on same date & channel
     clean_raw = re.sub(r"\s+", " ", order_data.get("raw_text", "")).strip()
@@ -41,9 +41,8 @@ def save_order_to_db(order_data: Dict[str, Any]) -> Optional[int]:
         for ex_row in cur.fetchall():
             ex_clean = re.sub(r"\s+", " ", ex_row["raw_text"] or "").strip()
             if clean_raw == ex_clean:
-                print(f"[Order Importer] Duplicate order detected (same content on {order_date} in {channel}): matched Order #{ex_row['id']}", flush=True)
                 conn.close()
-                return ex_row["id"]
+                return (ex_row["id"], False) if return_is_new else ex_row["id"]
 
     cur.execute("""
         INSERT INTO orders (
@@ -88,7 +87,7 @@ def save_order_to_db(order_data: Dict[str, Any]) -> Optional[int]:
 
     conn.commit()
     conn.close()
-    return order_id
+    return (order_id, True) if return_is_new else order_id
 
 
 def import_telegram_export_json(file_content: str, default_channel: str = "online") -> Dict[str, Any]:

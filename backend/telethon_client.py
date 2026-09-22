@@ -6,6 +6,7 @@ import threading
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from telethon.tl.types import Channel, Chat
 from telethon.errors import SessionPasswordNeededError
 
@@ -16,7 +17,7 @@ SESSION_PATH = os.path.join(BASE_DIR, "data", "telethon_user")
 DEFAULT_API_ID = 2040
 DEFAULT_API_HASH = "b18441a1ff607e10a989891a5462e627"
 
-from backend.database import get_settings, get_sku_cost_map, get_db_connection
+from backend.database import get_settings, update_setting, get_sku_cost_map, get_db_connection
 from backend.parser import parse_order_message
 from backend.order_importer import save_order_to_db
 
@@ -47,7 +48,14 @@ class TelethonManager:
     async def _ensure_client(self):
         if self.client is None:
             api_id, api_hash = self._get_credentials()
-            self.client = TelegramClient(SESSION_PATH, api_id, api_hash, loop=self.loop)
+            settings = get_settings()
+            string_session = settings.get("TELETHON_STRING_SESSION", "").strip()
+            if string_session:
+                self.client = TelegramClient(StringSession(string_session), api_id, api_hash, loop=self.loop)
+            elif os.path.exists(SESSION_PATH + ".session"):
+                self.client = TelegramClient(SESSION_PATH, api_id, api_hash, loop=self.loop)
+            else:
+                self.client = TelegramClient(StringSession(""), api_id, api_hash, loop=self.loop)
         if not self.client.is_connected():
             await self.client.connect()
 
@@ -118,6 +126,14 @@ class TelethonManager:
                     self._register_listener()
                 except Exception:
                     pass
+
+                try:
+                    session_str = self.client.session.save()
+                    if session_str:
+                        update_setting("TELETHON_STRING_SESSION", session_str)
+                        print(f"[Telethon] Permanent StringSession saved to database ({len(session_str)} chars)", flush=True)
+                except Exception as ex:
+                    print(f"[Telethon] Warning: Could not save session string: {ex}", flush=True)
 
                 user_info = {
                     "id": me.id,
