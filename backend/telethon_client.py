@@ -174,10 +174,10 @@ class TelethonManager:
                 scanned_count = 0
                 imported_orders = 0
 
-                async for msg in self.client.iter_messages(chat_id, reverse=True):
+                async for msg in self.client.iter_messages(chat_id, limit=400):
                     msg_dt = msg.date.replace(tzinfo=None)
                     if msg_dt < since_dt:
-                        continue
+                        break
 
                     scanned_count += 1
                     text = msg.text or msg.message or ""
@@ -197,19 +197,38 @@ class TelethonManager:
                     time_str = msg_dt.strftime("%Y-%m-%d %H:%M:%S")
                     msg_id = str(msg.id)
 
-                    parsed = parse_order_message(
-                        text=text,
-                        source_channel=channel,
-                        sku_cost_map=sku_cost_map,
-                        sender_name=sender_name,
-                        order_date=date_str,
-                        order_time=time_str,
-                        message_id=msg_id
-                    )
-
-                    if parsed:
-                        save_order_to_db(parsed)
-                        imported_orders += 1
+                    raw_numbered = re.split(r"(?:^|\n)\s*\d+\.\s*\n", text)
+                    if len(raw_numbered) > 1 and any("ลูกค้า" in b or "รหัส" in b or "สรุปออเดอร์" in b for b in raw_numbered):
+                        blocks = [b.strip() for b in raw_numbered if b.strip()]
+                        for b_idx, block_text in enumerate(blocks):
+                            sub_msg_id = f"{msg_id}_{b_idx+1}"
+                            parsed = parse_order_message(
+                                text=block_text,
+                                source_channel=channel,
+                                sku_cost_map=sku_cost_map,
+                                sender_name=sender_name,
+                                order_date=date_str,
+                                order_time=time_str,
+                                message_id=sub_msg_id
+                            )
+                            if parsed:
+                                oid = save_order_to_db(parsed)
+                                if oid:
+                                    imported_orders += 1
+                    else:
+                        parsed = parse_order_message(
+                            text=text,
+                            source_channel=channel,
+                            sku_cost_map=sku_cost_map,
+                            sender_name=sender_name,
+                            order_date=date_str,
+                            order_time=time_str,
+                            message_id=msg_id
+                        )
+                        if parsed:
+                            oid = save_order_to_db(parsed)
+                            if oid:
+                                imported_orders += 1
 
                 return {
                     "success": True,
