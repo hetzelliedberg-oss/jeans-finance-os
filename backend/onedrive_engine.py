@@ -424,50 +424,8 @@ def save_onedrive_closings(closings: List[Dict[str, Any]], source_url: str = "")
                 item.get("notes", ""), json.dumps(item, ensure_ascii=False), now_str
             ))
 
-        # Also sync to orders table for storefront_kkc so dashboard reflects it immediately
-        if ch in ["storefront_kkc", "kkc"] and item["gross_sales"] > 0:
-            msg_id = f"kkc_closing_{r_date}"
-            cur.execute("SELECT id FROM orders WHERE source_channel = 'kkc' AND message_id = ?", (msg_id,))
-            ex_ord = cur.fetchone()
-            cash_val = item.get("cod_amount", 0.0)
-            tr_val = item.get("transfer_amount", 0.0)
-            pcs_val = item.get("pieces_count", 0)
-            cogs_val = item.get("cogs", 0.0)
-            orders_val = item.get("orders_count", 0)
-            raw_desc = f"ปิดยอดหน้าร้าน KKC วันที่ {r_date}: ยอดขาย ฿{item['gross_sales']:,.2f} (สด {cash_val:,.2f} / โอน {tr_val:,.2f}) {pcs_val} ตัว {orders_val} คน"
-            unit_c = round(cogs_val / max(pcs_val, 1), 2) if pcs_val > 0 else 0.0
-
-            if ex_ord:
-                oid = ex_ord["id"]
-                cur.execute("""
-                    UPDATE orders SET
-                        total_pieces = ?, total_sales = ?, transfer_amount = ?,
-                        cod_amount = ?, cogs_total = ?, raw_text = ?,
-                        sender_name = 'หน้าร้านเซนทรัล KKC', status = 'completed'
-                    WHERE id = ?
-                """, (pcs_val, item["gross_sales"], tr_val, cash_val, cogs_val, raw_desc, oid))
-                cur.execute("DELETE FROM order_items WHERE order_id = ?", (oid,))
-            else:
-                cur.execute("""
-                    INSERT INTO orders (
-                        source_channel, message_id, sender_name, order_date, order_time,
-                        raw_text, total_pieces, total_sales, payment_method, cod_amount,
-                        transfer_amount, cogs_total, commission_amount, status, created_at,
-                        customer_name, platform
-                    ) VALUES (
-                        'kkc', ?, 'หน้าร้านเซนทรัล KKC', ?, ?,
-                        ?, ?, ?, 'โอน', ?,
-                        ?, ?, 0.0, 'completed', ?,
-                        'ลูกค้าหน้าร้าน', 'storefront'
-                    )
-                """, (msg_id, r_date, f"{r_date} 21:30:00", raw_desc, pcs_val, item["gross_sales"], cash_val, tr_val, cogs_val, now_str))
-                oid = cur.lastrowid
-
-            if pcs_val > 0:
-                cur.execute("""
-                    INSERT INTO order_items (order_id, sku, size, color, quantity, unit_cost, total_cost)
-                    VALUES (?, 'KKC_STORE', 'MIX', '', ?, ?, ?)
-                """, (oid, pcs_val, unit_c, cogs_val))
+        # Keep onedrive_closings separate; do not insert synthetic closing orders into orders table.
+        pass
 
         saved_count += 1
 
