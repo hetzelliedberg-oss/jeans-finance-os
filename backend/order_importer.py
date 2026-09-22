@@ -26,13 +26,24 @@ def save_order_to_db(order_data: Dict[str, Any]) -> Optional[int]:
     order_date = order_data.get("order_date") or datetime.now().strftime("%Y-%m-%d")
     order_time = order_data.get("order_time") or f"{order_date} 12:00:00"
 
-    # Check duplicate
+    # Check duplicate by message_id
     if msg_id:
         cur.execute("SELECT id FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
         existing = cur.fetchone()
         if existing:
             conn.close()
             return existing["id"]
+
+    # Check duplicate by identical order text on same date & channel
+    clean_raw = re.sub(r"\s+", " ", order_data.get("raw_text", "")).strip()
+    if clean_raw and len(clean_raw) > 15:
+        cur.execute("SELECT id, raw_text FROM orders WHERE source_channel = ? AND order_date = ? AND status != 'cancelled'", (channel, order_date))
+        for ex_row in cur.fetchall():
+            ex_clean = re.sub(r"\s+", " ", ex_row["raw_text"] or "").strip()
+            if clean_raw == ex_clean:
+                print(f"[Order Importer] Duplicate order detected (same content on {order_date} in {channel}): matched Order #{ex_row['id']}", flush=True)
+                conn.close()
+                return ex_row["id"]
 
     cur.execute("""
         INSERT INTO orders (

@@ -284,6 +284,7 @@ class OrderUpdateRequest(BaseModel):
     cod_amount: Optional[float] = None
     transfer_amount: Optional[float] = None
     source_channel: Optional[str] = None
+    status: Optional[str] = None
 
 
 @app.patch("/api/orders/{order_id}")
@@ -302,6 +303,16 @@ def update_order_by_id(order_id: int, req: OrderUpdateRequest):
         conn.commit()
     conn.close()
     return {"success": True, "order_id": order_id}
+
+
+@app.delete("/api/orders/{order_id}")
+def delete_order_by_id(order_id: int):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("UPDATE orders SET status = 'cancelled' WHERE id = ?", (order_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True, "deleted_order_id": order_id}
 
 
 
