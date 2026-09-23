@@ -330,8 +330,8 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
             try:
                 dt_parsed = datetime.strptime(parsed_dt, "%Y-%m-%d")
                 dt_default = datetime.strptime(default_date, "%Y-%m-%d")
-                if abs((dt_parsed - dt_default).days) > 2:
-                    # Typo in text date (e.g. typed 8/9 instead of 19/9) -> fallback to message date!
+                if dt_parsed != dt_default:
+                    # Staff frequently copy-paste previous day's template (e.g. 22/9/69 on 23/9/69)
                     parsed_dt = default_date
             except Exception:
                 parsed_dt = default_date
@@ -448,6 +448,8 @@ def parse_order_message(
                 structured["sender_name"] = sender_name
             if source_channel:
                 structured["source_channel"] = source_channel
+            if order_time:
+                structured["order_time"] = order_time
             return structured
 
 

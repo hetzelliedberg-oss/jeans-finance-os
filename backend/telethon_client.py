@@ -3,7 +3,7 @@ import sys
 import re
 import asyncio
 import threading
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
@@ -191,8 +191,9 @@ class TelethonManager:
                 imported_orders = 0
 
                 async for msg in self.client.iter_messages(chat_id, limit=400):
-                    msg_dt = msg.date.replace(tzinfo=None)
-                    if msg_dt < since_dt:
+                    tz_th = timezone(timedelta(hours=7))
+                    dt_th = msg.date.astimezone(tz_th)
+                    if dt_th.replace(tzinfo=None) < since_dt:
                         break
 
                     scanned_count += 1
@@ -209,8 +210,8 @@ class TelethonManager:
                     except Exception:
                         pass
 
-                    date_str = msg_dt.strftime("%Y-%m-%d")
-                    time_str = msg_dt.strftime("%Y-%m-%d %H:%M:%S")
+                    date_str = dt_th.strftime("%Y-%m-%d")
+                    time_str = dt_th.strftime("%Y-%m-%d %H:%M:%S")
                     msg_id = str(msg.id)
 
                     raw_numbered = re.split(r"(?:^|\n)\s*\d+\.\s*\n", text)
@@ -281,7 +282,8 @@ class TelethonManager:
                 sender = await event.get_sender()
                 sender_name = getattr(sender, "first_name", "") or ""
 
-                dt = event.message.date.replace(tzinfo=None)
+                tz_th = timezone(timedelta(hours=7))
+                dt = event.message.date.astimezone(tz_th)
                 sku_cost_map = get_sku_cost_map()
 
                 parsed = parse_order_message(
