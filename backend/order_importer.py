@@ -26,11 +26,70 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
     order_date = order_data.get("order_date") or datetime.now().strftime("%Y-%m-%d")
     order_time = order_data.get("order_time") or f"{order_date} 12:00:00"
 
-    # Check duplicate by message_id
+    # Check if order exists by message_id; if exists and edited, update it!
     if msg_id:
-        cur.execute("SELECT id FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
+        cur.execute("SELECT id, raw_text, total_sales, total_pieces, cod_amount, transfer_amount FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
         existing = cur.fetchone()
         if existing:
+            existing_id = existing["id"]
+            raw_new = (order_data.get("raw_text") or "").strip()
+            raw_old = (existing["raw_text"] or "").strip()
+            # If text, sales, pieces, cod, or transfer changed -> update order and replace items!
+            if (raw_new != raw_old or
+                abs(order_data.get("total_sales", 0.0) - (existing["total_sales"] or 0.0)) > 0.01 or
+                order_data.get("total_pieces", 1) != existing["total_pieces"] or
+                abs(order_data.get("cod_amount", 0.0) - (existing["cod_amount"] or 0.0)) > 0.01 or
+                abs(order_data.get("transfer_amount", 0.0) - (existing["transfer_amount"] or 0.0)) > 0.01):
+                cur.execute("""
+                    UPDATE orders SET
+                        sender_name = ?,
+                        order_date = ?,
+                        order_time = ?,
+                        raw_text = ?,
+                        total_pieces = ?,
+                        total_sales = ?,
+                        payment_method = ?,
+                        cod_amount = ?,
+                        transfer_amount = ?,
+                        cogs_total = ?,
+                        commission_amount = ?,
+                        created_at = ?
+                    WHERE id = ?
+                """, (
+                    order_data.get("sender_name", "แอดมินทั่วไป"),
+                    order_date,
+                    order_time,
+                    order_data.get("raw_text", ""),
+                    order_data.get("total_pieces", 1),
+                    order_data.get("total_sales", 0.0),
+                    order_data.get("payment_method", "โอน"),
+                    order_data.get("cod_amount", 0.0),
+                    order_data.get("transfer_amount", 0.0),
+                    order_data.get("cogs_total", 0.0),
+                    order_data.get("commission_amount", 0.0),
+                    now_str,
+                    existing_id
+                ))
+                # Refresh items
+                cur.execute("DELETE FROM order_items WHERE order_id = ?", (existing_id,))
+                for itm in order_data.get("items", []):
+                    cur.execute("""
+                        INSERT INTO order_items (
+                            order_id, sku, size, color, quantity, unit_cost, total_cost
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        existing_id,
+                        itm.get("sku", ""),
+                        itm.get("size", ""),
+                        itm.get("color", ""),
+                        itm.get("quantity", 1),
+                        itm.get("unit_cost", 0.0),
+                        itm.get("total_cost", 0.0)
+                    ))
+                conn.commit()
+                conn.close()
+                return (existing_id, False) if return_is_new else existing_id
+
             conn.close()
             return (existing["id"], False) if return_is_new else existing["id"]
 

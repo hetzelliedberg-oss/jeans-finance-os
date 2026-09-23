@@ -189,6 +189,7 @@ class TelethonManager:
 
                 scanned_count = 0
                 imported_orders = 0
+                live_msg_ids = set()
 
                 async for msg in self.client.iter_messages(chat_id, limit=400):
                     tz_th = timezone(timedelta(hours=7))
@@ -219,6 +220,7 @@ class TelethonManager:
                         blocks = [b.strip() for b in raw_numbered if b.strip()]
                         for b_idx, block_text in enumerate(blocks):
                             sub_msg_id = f"{msg_id}_{b_idx+1}"
+                            live_msg_ids.add(sub_msg_id)
                             parsed = parse_order_message(
                                 text=block_text,
                                 source_channel=channel,
@@ -233,6 +235,7 @@ class TelethonManager:
                                 if oid:
                                     imported_orders += 1
                     else:
+                        live_msg_ids.add(msg_id)
                         parsed = parse_order_message(
                             text=text,
                             source_channel=channel,
@@ -247,10 +250,31 @@ class TelethonManager:
                             if oid:
                                 imported_orders += 1
 
+                # Clean up deleted messages (orders in DB within date range that no longer exist in Telegram)
+                deleted_orders = 0
+                if live_msg_ids:
+                    conn = get_db_connection()
+                    cur = conn.cursor()
+                    since_date_str = since_dt.strftime("%Y-%m-%d")
+                    cur.execute(
+                        "SELECT id, message_id FROM orders WHERE source_channel = ? AND order_date >= ?",
+                        (channel, since_date_str)
+                    )
+                    db_rows = cur.fetchall()
+                    for r in db_rows:
+                        m_id = str(r["message_id"]) if r["message_id"] else ""
+                        if m_id and m_id not in live_msg_ids:
+                            cur.execute("DELETE FROM order_items WHERE order_id = ?", (r["id"],))
+                            cur.execute("DELETE FROM orders WHERE id = ?", (r["id"],))
+                            deleted_orders += 1
+                    conn.commit()
+                    conn.close()
+
                 return {
                     "success": True,
                     "scanned_messages": scanned_count,
                     "imported_orders": imported_orders,
+                    "deleted_orders": deleted_orders,
                     "channel": channel
                 }
 
@@ -261,12 +285,13 @@ class TelethonManager:
         return future.result(timeout=600)
 
     def _register_listener(self):
-        """Register live event listener for forward streaming"""
+        """Register live event listener for forward streaming (new, edit, and delete)"""
         if self.client is None:
             return
 
         @self.client.on(events.NewMessage())
-        async def _handler(event):
+        @self.client.on(events.MessageEdited())
+        async def _message_handler(event):
             try:
                 chat = await event.get_chat()
                 chat_title = getattr(chat, "title", "")
@@ -299,7 +324,26 @@ class TelethonManager:
                 if parsed:
                     save_order_to_db(parsed)
             except Exception as ex:
-                print("Live message error:", ex)
+                print("Live message/edit error:", ex)
+
+        @self.client.on(events.MessageDeleted())
+        async def _delete_handler(event):
+            try:
+                del_ids = [str(mid) for mid in event.deleted_ids]
+                if del_ids:
+                    conn = get_db_connection()
+                    cur = conn.cursor()
+                    placeholders = ",".join(["?"] * len(del_ids))
+                    cur.execute(f"SELECT id FROM orders WHERE message_id IN ({placeholders})", del_ids)
+                    to_delete = cur.fetchall()
+                    for r in to_delete:
+                        cur.execute("DELETE FROM order_items WHERE order_id = ?", (r["id"],))
+                        cur.execute("DELETE FROM orders WHERE id = ?", (r["id"],))
+                    conn.commit()
+                    conn.close()
+                    print(f"Live delete: removed {len(to_delete)} orders from DB")
+            except Exception as ex:
+                print("Live delete error:", ex)
 
 
 telethon_manager = TelethonManager()
