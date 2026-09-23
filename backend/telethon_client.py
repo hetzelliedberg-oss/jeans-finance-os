@@ -345,5 +345,87 @@ class TelethonManager:
             except Exception as ex:
                 print("Live delete error:", ex)
 
+    def start(self):
+        """Start Telethon daemon on application boot with live listeners and auto-audit loop"""
+        async def _init_and_start():
+            try:
+                await self._ensure_client()
+                if await self.client.is_user_authorized():
+                    self._register_listener()
+                    print("[Telethon] ✅ Live listener registered (NewMessage, Edit, and Delete)", flush=True)
+                    # Run immediate initial audit on boot
+                    await self._run_daily_audit()
+                    # Start continuous 30-second audit loop
+                    asyncio.create_task(self._auto_sync_loop())
+                else:
+                    print("[Telethon] ⚠ Client connected but not authorized. Pending login.", flush=True)
+            except Exception as e:
+                print(f"[Telethon] ⚠ Error during daemon start: {e}", flush=True)
+
+        asyncio.run_coroutine_threadsafe(_init_and_start(), self.loop)
+
+    async def _run_daily_audit(self):
+        """Audit and reconcile today's messages for both Online and KKC"""
+        try:
+            tz_th = timezone(timedelta(hours=7))
+            start_utc = datetime.now(tz_th).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
+            sku_cost_map = get_sku_cost_map()
+            
+            for ch_id, ch_name in [(-4242902075, "online"), (-5366638194, "kkc")]:
+                try:
+                    entity = await self.client.get_entity(ch_id)
+                    live_msg_ids = set()
+                    async for msg in self.client.iter_messages(entity, offset_date=datetime.now(timezone.utc)):
+                        if msg.date < start_utc:
+                            break
+                        if msg.text and any(k in msg.text for k in ["สรุปออเดอร์", "ปลายทาง", "โอน", "รหัสสินค้า", "เงินสด"]):
+                            th_dt = msg.date.astimezone(tz_th).strftime("%Y-%m-%d %H:%M:%S")
+                            d_str = th_dt.split()[0]
+                            p = parse_order_message(
+                                text=msg.text,
+                                source_channel=ch_name,
+                                sku_cost_map=sku_cost_map,
+                                order_date=d_str,
+                                order_time=th_dt,
+                                message_id=str(msg.id)
+                            )
+                            if p:
+                                p["order_date"] = d_str
+                                p["order_time"] = th_dt
+                                live_msg_ids.add(str(msg.id))
+                                save_order_to_db(p)
+                                
+                    # Clean up deleted messages for today
+                    if live_msg_ids:
+                        conn = get_db_connection()
+                        cur = conn.cursor()
+                        today_str = datetime.now(tz_th).strftime("%Y-%m-%d")
+                        cur.execute(
+                            "SELECT id, message_id FROM orders WHERE source_channel = ? AND order_date = ?",
+                            (ch_name, today_str)
+                        )
+                        for r in cur.fetchall():
+                            m_id = str(r["message_id"]) if r["message_id"] else ""
+                            if m_id and m_id not in live_msg_ids:
+                                cur.execute("DELETE FROM order_items WHERE order_id = ?", (r["id"],))
+                                cur.execute("DELETE FROM orders WHERE id = ?", (r["id"],))
+                        conn.commit()
+                        conn.close()
+                except Exception as ex_ch:
+                    pass
+        except Exception as ex:
+            print(f"[Telethon Audit] Global error: {ex}", flush=True)
+
+    async def _auto_sync_loop(self):
+        """Periodic auto-audit and reconciliation every 30 seconds"""
+        print("[Telethon] 🔄 Auto-Audit Heartbeat active (interval: 30s)", flush=True)
+        while True:
+            await asyncio.sleep(30)
+            try:
+                if self.client and await self.client.is_user_authorized():
+                    await self._run_daily_audit()
+            except Exception as ex:
+                pass
+
 
 telethon_manager = TelethonManager()

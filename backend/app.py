@@ -49,9 +49,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Start background workers: Telegram bot & FB Ads auto-sync
+# Start background workers: Telegram bot, FB Ads auto-sync, and Telethon Live Listener
 telegram_bot_instance.start()
 ads_sync_instance.start()
+telethon_manager.start()
 
 # ─── PRODUCTION KEEPALIVE + AUTO DB BACKUP ───────────────────────────────────
 import threading, time, base64, requests as _req
