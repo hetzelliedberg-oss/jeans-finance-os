@@ -169,16 +169,24 @@ def parse_order_items(text: str, sku_cost_map: Dict[str, float]) -> List[Dict[st
 
         # Quantity in this segment
         qty = 1
-        qty_match = re.search(r"(\d+)\s*(?:ตัว|ชิ้น|ea|pcs|สี)", segment)
-        if not qty_match:
-            qty_match = re.search(r"(?:=|\*|x)\s*(\d+)", segment)
-        if qty_match:
-            try:
-                parsed_qty = int(qty_match.group(1))
-                if 1 <= parsed_qty <= 500:
-                    qty = parsed_qty
-            except ValueError:
-                pass
+        if "สองสี" in segment or "2สี" in segment or "2ตัว" in segment:
+            qty = 2
+        elif "สามสี" in segment or "3สี" in segment or "3ตัว" in segment:
+            qty = 3
+        elif "สี่สี" in segment or "4สี" in segment or "4ตัว" in segment:
+            qty = 4
+        else:
+            qty_match = re.search(r"(\d+)\s*(?:ตัว|ชิ้น|ea|pcs|สี)", segment)
+            if not qty_match:
+                # Avoid matching delivery date like *30ก.ย or *2ต.ค
+                qty_match = re.search(r"(?:=|\*|x)\s*(\d+)(?!\s*(?:[ก-๙]{1,3}\.|\d|/))", segment)
+            if qty_match:
+                try:
+                    parsed_qty = int(qty_match.group(1))
+                    if 1 <= parsed_qty <= 50:
+                        qty = parsed_qty
+                except ValueError:
+                    pass
 
         # Size in this segment
         size = ""

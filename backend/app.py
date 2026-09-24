@@ -25,7 +25,6 @@ from backend.order_importer import (
     save_order_to_db, import_telegram_export_json,
     import_pasted_text
 )
-from backend.import_fact_orders import import_fact_orders_from_chat
 from backend.migrate_and_import_fb_page import audit_page_vs_telegram
 from backend.telegram_bot import telegram_bot_instance
 from backend.telethon_client import telethon_manager
@@ -36,7 +35,6 @@ from backend.onedrive_engine import (
 
 # Initialize database & schema
 init_db()
-import_fact_orders_from_chat()
 
 app = FastAPI(title="Jeans Around Finance OS", version="1.0.0")
 
