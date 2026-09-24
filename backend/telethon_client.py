@@ -18,7 +18,7 @@ DEFAULT_API_ID = 2040
 DEFAULT_API_HASH = "b18441a1ff607e10a989891a5462e627"
 
 from backend.database import get_settings, update_setting, get_sku_cost_map, get_db_connection
-from backend.parser import parse_order_message
+from backend.parser import parse_order_message, extract_business_date
 from backend.order_importer import save_order_to_db
 
 
@@ -316,7 +316,7 @@ class TelethonManager:
                     source_channel=channel,
                     sku_cost_map=sku_cost_map,
                     sender_name=sender_name,
-                    order_date=dt.strftime("%Y-%m-%d"),
+                    order_date=extract_business_date(dt, text),
                     order_time=dt.strftime("%Y-%m-%d %H:%M:%S"),
                     message_id=str(event.message.id)
                 )
@@ -379,20 +379,22 @@ class TelethonManager:
                         if msg.date < start_utc:
                             break
                         if msg.text and any(k in msg.text for k in ["สรุปออเดอร์", "ปลายทาง", "โอน", "รหัสสินค้า", "เงินสด"]):
-                            th_dt = msg.date.astimezone(tz_th).strftime("%Y-%m-%d %H:%M:%S")
-                            d_str = th_dt.split()[0]
+                            th_dt = msg.date.astimezone(tz_th)
+                            d_str = extract_business_date(th_dt, msg.text or "")
+                            time_str = th_dt.strftime("%Y-%m-%d %H:%M:%S")
                             p = parse_order_message(
                                 text=msg.text,
                                 source_channel=ch_name,
                                 sku_cost_map=sku_cost_map,
                                 order_date=d_str,
-                                order_time=th_dt,
+                                order_time=time_str,
                                 message_id=str(msg.id)
                             )
                             if p:
                                 p["order_date"] = d_str
-                                p["order_time"] = th_dt
-                                live_msg_ids.add(str(msg.id))
+                                p["order_time"] = time_str
+                                if d_str == datetime.now(tz_th).strftime("%Y-%m-%d"):
+                                    live_msg_ids.add(str(msg.id))
                                 save_order_to_db(p)
                                 
                     # Clean up deleted messages for today

@@ -1,7 +1,19 @@
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
+
+def extract_business_date(dt_th: datetime, text: str) -> str:
+    """
+    Handle late-night orders posted past midnight (00:00 - 05:59)
+    that belong to yesterday's batch (e.g. sequence number > 10 like order #39 continuing #38).
+    """
+    lines = [l.strip() for l in (text or "").strip().split('\n') if l.strip()]
+    first_line = lines[0] if lines else ""
+    m_seq = re.match(r'^(\d+)', first_line)
+    if dt_th.hour < 6 and m_seq and int(m_seq.group(1)) > 10:
+        return (dt_th - timedelta(days=1)).strftime("%Y-%m-%d")
+    return dt_th.strftime("%Y-%m-%d")
 
 def normalize_sku(raw_sku: str) -> str:
     """Normalize SKU string, e.g. 'xrp 67' -> 'XRP67', 'ar-01' -> 'AR01', 'AR23 ขาว' -> 'AR23ขาว'"""
