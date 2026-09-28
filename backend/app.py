@@ -282,6 +282,7 @@ class OrderUpdateRequest(BaseModel):
     payment_method: Optional[str] = None
     cod_amount: Optional[float] = None
     transfer_amount: Optional[float] = None
+    cogs_total: Optional[float] = None
     source_channel: Optional[str] = None
     status: Optional[str] = None
 
