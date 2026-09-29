@@ -35,6 +35,14 @@ class TelegramBotWorker:
                     time.sleep(5)
                     continue
 
+                # Ensure webhook is cleared so getUpdates works reliably
+                if getattr(self, "_webhook_cleared", False) is False:
+                    try:
+                        requests.post(f"https://api.telegram.org/bot{token}/deleteWebhook", timeout=10)
+                        self._webhook_cleared = True
+                    except Exception:
+                        pass
+
                 online_chat_id = settings.get("TELEGRAM_ONLINE_CHAT_ID", "").strip()
                 kkc_chat_id = settings.get("TELEGRAM_KKC_CHAT_ID", "").strip()
 

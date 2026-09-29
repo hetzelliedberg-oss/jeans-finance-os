@@ -45,19 +45,36 @@ class TelethonManager:
         api_hash = api_hash_val if api_hash_val else DEFAULT_API_HASH
         return api_id, api_hash
 
-    async def _ensure_client(self):
-        if self.client is None:
+    async def _ensure_client(self, force_new=False):
+        if self.client is None or force_new:
             api_id, api_hash = self._get_credentials()
             settings = get_settings()
-            string_session = settings.get("TELETHON_STRING_SESSION", "").strip()
+            string_session = settings.get("TELETHON_STRING_SESSION", "").strip() if not force_new else ""
             if string_session:
                 self.client = TelegramClient(StringSession(string_session), api_id, api_hash, loop=self.loop)
-            elif os.path.exists(SESSION_PATH + ".session"):
+            elif os.path.exists(SESSION_PATH + ".session") and not force_new:
                 self.client = TelegramClient(SESSION_PATH, api_id, api_hash, loop=self.loop)
             else:
                 self.client = TelegramClient(StringSession(""), api_id, api_hash, loop=self.loop)
+
         if not self.client.is_connected():
-            await self.client.connect()
+            try:
+                await self.client.connect()
+            except Exception as e:
+                err_str = str(e)
+                if "AuthKeyDuplicatedError" in type(e).__name__ or "used under two different IP" in err_str:
+                    print("[Telethon] Warning: Session revoked (AuthKeyDuplicated). Resetting session...", flush=True)
+                    update_setting("TELETHON_STRING_SESSION", "")
+                    if os.path.exists(SESSION_PATH + ".session"):
+                        try:
+                            os.remove(SESSION_PATH + ".session")
+                        except Exception:
+                            pass
+                    api_id, api_hash = self._get_credentials()
+                    self.client = TelegramClient(StringSession(""), api_id, api_hash, loop=self.loop)
+                    await self.client.connect()
+                else:
+                    raise e
 
     def get_status(self) -> Dict[str, Any]:
         """Check if client is currently logged in"""
