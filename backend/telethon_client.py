@@ -118,6 +118,10 @@ class TelethonManager:
                 res = await self.client.send_code_request(clean_phone)
                 self.phone_number = clean_phone
                 self.phone_code_hash = res.phone_code_hash
+                session_str = self.client.session.save()
+                update_setting("TELETHON_STRING_SESSION", session_str)
+                update_setting("PENDING_PHONE_NUMBER", clean_phone)
+                update_setting("PENDING_PHONE_CODE_HASH", res.phone_code_hash)
                 return {"success": True, "phone_code_hash": res.phone_code_hash, "phone": clean_phone}
             except Exception as e:
                 return {"success": False, "error": str(e)}
@@ -128,11 +132,15 @@ class TelethonManager:
     def verify_login_code(self, code: str, password: str = "") -> Dict[str, Any]:
         """Verify code and finish authorization"""
         clean_code = code.strip().replace(" ", "").replace("-", "")
+        settings = get_settings()
+        phone_num = self.phone_number or settings.get("PENDING_PHONE_NUMBER", "")
+        code_hash = self.phone_code_hash or settings.get("PENDING_PHONE_CODE_HASH", "")
+
         async def _verify():
             try:
                 await self._ensure_client()
                 try:
-                    await self.client.sign_in(phone=self.phone_number, code=clean_code, phone_code_hash=self.phone_code_hash)
+                    await self.client.sign_in(phone=phone_num, code=clean_code, phone_code_hash=code_hash)
                 except SessionPasswordNeededError:
                     if not password:
                         return {"success": False, "requires_password": True, "error": "บัญชีนี้เปิดใช้งาน 2FA กรุณากรอกรหัสผ่าน 2-Step Verification ในช่อง 2FA"}
