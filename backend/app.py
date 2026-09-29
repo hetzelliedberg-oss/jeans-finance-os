@@ -234,8 +234,11 @@ def get_orders_list(
         conditions.append("order_date <= ?")
         params.append(end_date)
     if channel and channel != "consolidated" and channel != "all":
-        conditions.append("source_channel = ?")
-        params.append(channel)
+        if channel in ["kkc", "storefront_kkc"]:
+            conditions.append("source_channel IN ('kkc', 'storefront_kkc')")
+        else:
+            conditions.append("source_channel = ?")
+            params.append(channel)
     if admin:
         conditions.append("sender_name = ?")
         params.append(admin)
@@ -424,7 +427,7 @@ def telegram_list_dialogs():
 @app.post("/api/telegram/sync")
 def telegram_sync_group(req: TelegramSyncRequest):
     """Sync past messages from selected group into orders table"""
-    ch = "storefront_kkc" if req.channel in ["kkc", "storefront_kkc"] else "online"
+    ch = "kkc" if req.channel in ["kkc", "storefront_kkc"] else "online"
     res = telethon_manager.sync_group_history(req.chat_id, ch, req.since_date or "2026-08-01")
     return res
 

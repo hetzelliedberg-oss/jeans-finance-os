@@ -63,7 +63,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     all_orders = cur.fetchall()
 
     online_orders = [o for o in all_orders if o["source_channel"] == "online"]
-    kkc_orders = [o for o in all_orders if o["source_channel"] == "kkc"]
+    kkc_orders = [o for o in all_orders if o["source_channel"] in ["kkc", "storefront_kkc"]]
 
     # 1. ONLINE CHANNEL CALCULATION
     online_orders_count = len(online_orders)
