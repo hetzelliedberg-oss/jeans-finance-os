@@ -555,7 +555,7 @@ def list_sku_costs():
 
 @app.post("/api/sku-costs")
 def save_sku_cost(item: SkuCostItem):
-    """Add or update an SKU cost"""
+    """Add or update an SKU cost and automatically update order_items and orders COGS"""
     conn = get_db_connection()
     cur = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -569,9 +569,77 @@ def save_sku_cost(item: SkuCostItem):
             note = excluded.note,
             updated_at = excluded.updated_at
     """, (clean_sku, item.cost, item.category or "Jeans", item.note or "", now_str))
+
+    # Auto-update order_items where SKU matches exact or starts with this base SKU (e.g. XRP69 -> XRP69ดำ, XRP69ฟ้า)
+    cur.execute("""
+        UPDATE order_items
+        SET unit_cost = ?, total_cost = quantity * ?
+        WHERE UPPER(sku) = ? OR UPPER(sku) LIKE ?
+    """, (item.cost, item.cost, clean_sku, f"{clean_sku}%"))
+
+    # Recalculate cogs_total in orders table for affected orders
+    cur.execute("""
+        UPDATE orders
+        SET cogs_total = (
+            SELECT COALESCE(SUM(total_cost), 0.0)
+            FROM order_items
+            WHERE order_items.order_id = orders.id
+        )
+        WHERE id IN (
+            SELECT DISTINCT order_id FROM order_items
+            WHERE UPPER(sku) = ? OR UPPER(sku) LIKE ?
+        )
+    """, (clean_sku, f"{clean_sku}%"))
+
     conn.commit()
     conn.close()
     return {"success": True, "sku": clean_sku, "cost": item.cost}
+
+
+@app.post("/api/sku-costs/recalculate")
+def recalculate_all_order_costs():
+    """Recalculate unit_cost and total_cost for all order_items and orders using current sku_costs map"""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT sku, cost FROM sku_costs")
+    cost_map = {r["sku"].upper(): float(r["cost"]) for r in cur.fetchall()}
+
+    cur.execute("SELECT id, sku, quantity FROM order_items")
+    items = cur.fetchall()
+    updated_items = 0
+
+    for it in items:
+        item_id = it["id"]
+        raw_sku = (it["sku"] or "").strip().upper()
+        qty = it["quantity"] or 1
+
+        cost = cost_map.get(raw_sku, 0.0)
+        if cost == 0.0:
+            m = re.match(r"^([A-Z]+)(\d+)", raw_sku)
+            if m:
+                base_sku = f"{m.group(1)}{m.group(2)}"
+                cost = cost_map.get(base_sku, 0.0)
+
+        if cost > 0:
+            cur.execute("""
+                UPDATE order_items
+                SET unit_cost = ?, total_cost = ?
+                WHERE id = ?
+            """, (cost, cost * qty, item_id))
+            updated_items += 1
+
+    # Recalculate all orders cogs_total
+    cur.execute("""
+        UPDATE orders
+        SET cogs_total = (
+            SELECT COALESCE(SUM(total_cost), 0.0)
+            FROM order_items
+            WHERE order_items.order_id = orders.id
+        )
+    """)
+    conn.commit()
+    conn.close()
+    return {"success": True, "updated_items_count": updated_items}
 
 
 @app.delete("/api/sku-costs/{sku}")

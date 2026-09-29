@@ -173,11 +173,9 @@ def parse_order_items(text: str, sku_cost_map: Dict[str, float]) -> List[Dict[st
         segment = text[start_idx:end_idx]
 
         unit_cost = sku_cost_map.get(sku, 0.0)
-        if unit_cost == 0.0 and sku not in sku_cost_map:
-            base_sku = f"{prefix}{num}"
-            if base_sku in sku_cost_map:
-                sku = base_sku
-                unit_cost = sku_cost_map.get(sku, 0.0)
+        base_sku = f"{prefix}{num}"
+        if unit_cost == 0.0 and base_sku in sku_cost_map:
+            unit_cost = sku_cost_map[base_sku]
 
         # Quantity in this segment
         qty = 1
