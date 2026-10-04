@@ -399,7 +399,7 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
         cost = sku_cost_map.get(sku_norm, 0.0)
         if cost == 0.0:
             m_base = re.search(r'(AR\d+|XRP\d+)', sku_norm)
-            cost = sku_cost_map.get(m_base.group(1), 456.83) if m_base else 456.83
+            cost = sku_cost_map.get(m_base.group(1), 350.0) if m_base else 350.0
         items.append({
             "sku": sku_norm,
             "size": sz,
