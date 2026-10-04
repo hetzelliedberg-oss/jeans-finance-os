@@ -26,19 +26,22 @@ c.execute("""
            sum(total_sales) as sales,
            sum(cogs_total) as cogs
     FROM orders
-    WHERE source_channel = 'kkc' AND (order_date LIKE '2026-08%' OR order_date LIKE '2026-09%')
+    WHERE source_channel IN ('kkc', 'storefront_kkc') AND (order_date LIKE '2026-08%' OR order_date LIKE '2026-09%' OR order_date LIKE '2026-10%')
     GROUP BY d
     ORDER BY d
 """)
 orders_by_day = {r[0]: {"bills": r[1], "pcs": r[2], "sales": r[3], "cogs": r[4]} for r in c.fetchall()}
 conn.close()
 
-for month_num, month_name in [(8, "สิงหาคม 2026"), (9, "กันยายน 2026")]:
+import calendar
+
+for month_num, month_name in [(8, "สิงหาคม 2026"), (9, "กันยายน 2026"), (10, "ตุลาคม 2026")]:
+    days_in_month = calendar.monthrange(2026, month_num)[1]
+    rent_daily = round(27214.0 / days_in_month, 2)
     print(f"\n=========================================================================================================================")
     print(f"  งบกำไรขาดทุน FACT รายวัน หน้าร้านสาขาขอนแก่น (KKC P&L) - {month_name}")
-    print(f"  [ค่าเช่า: {rent_daily:.0f} บ./วัน | ค่าคน: {labor_weekday:.0f} บ.(จ-พฤ), {labor_weekend:.0f} บ.(ศ-อา) | เบ็ดเตล็ด: {misc_per_order:.0f} บ./บิล]")
+    print(f"  [ค่าเช่า: {rent_daily:.2f} บ./วัน (27,214/{days_in_month}) | ค่าคน: {labor_weekday:.0f} บ.(จ-พฤ), {labor_weekend:.0f} บ.(ศ-อา) | เบ็ดเตล็ด: {misc_per_order:.0f} บ./บิล]")
     print(f"=========================================================================================================================")
-    days_in_month = 31 if month_num == 8 else 27
     
     tot_sales = tot_cogs = tot_gp = tot_rent = tot_labor = tot_misc = tot_ads = tot_exp = tot_np = 0
     tot_bills = tot_pcs = 0

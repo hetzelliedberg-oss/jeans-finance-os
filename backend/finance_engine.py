@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import calendar
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from backend.database import get_db_connection, get_settings
@@ -37,7 +38,10 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     online_misc_rate = float(settings.get("ONLINE_MISC_PER_ORDER", "3.0"))
     online_cod_fee_pct = float(settings.get("ONLINE_COD_FEE_PCT", "2.14"))
 
-    kkc_rent_rate = float(settings.get("KKC_RENT_DAILY", "910.0"))
+    def get_kkc_daily_rent(dt: datetime) -> float:
+        days_in_m = calendar.monthrange(dt.year, dt.month)[1]
+        return round(27214.0 / days_in_m, 2)
+
     kkc_labor_weekday = float(settings.get("KKC_LABOR_WEEKDAY", "460.0"))
     kkc_labor_weekend = float(settings.get("KKC_LABOR_WEEKEND", "500.0"))
     kkc_misc_rate = float(settings.get("KKC_MISC_PER_ORDER", "6.0"))
@@ -92,7 +96,8 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     kkc_gross_profit = kkc_gross_sales - kkc_cogs
     kkc_gross_margin = (kkc_gross_profit / kkc_gross_sales * 100) if kkc_gross_sales > 0 else 0.0
 
-    kkc_rent = kkc_rent_rate * days_count
+    kkc_rent = sum(get_kkc_daily_rent(d) for d in dates_list)
+    kkc_rent_desc = f"{get_kkc_daily_rent(dates_list[0]):,.2f} บ./วัน" if days_count == 1 else f"สัญญา 27,214 บ./เดือน ({kkc_rent:,.2f} บ.)"
     kkc_labor = sum(kkc_labor_weekend if d.weekday() in [4, 5, 6] else kkc_labor_weekday for d in dates_list)
     kkc_misc = kkc_orders_count * kkc_misc_rate
     kkc_ads = fb_kkc_spend
@@ -155,7 +160,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": "2. หัก ต้นทุนสินค้าหน้าร้าน (COGS)", "amount": kkc_cogs, "pct": pct(kkc_cogs, target_sales), "type": "cost", "bold": True},
             {"label": "3. กำไรขั้นต้นหน้าร้าน (Gross Profit)", "amount": kkc_gross_profit, "pct": kkc_gross_margin, "type": "gross_profit", "bold": True},
             {"label": "4. ค่าใช้จ่ายหน้าร้าน KKC (Store Expenses):", "amount": kkc_expenses, "pct": pct(kkc_expenses, target_sales), "type": "header", "bold": True},
-            {"label": f"   - ค่าเช่าพื้นที่หน้าร้าน ({kkc_rent_rate:,.2f} บ./วัน)", "amount": kkc_rent, "pct": pct(kkc_rent, target_sales), "type": "expense"},
+            {"label": f"   - ค่าเช่าพื้นที่หน้าร้าน ({kkc_rent_desc})", "amount": kkc_rent, "pct": pct(kkc_rent, target_sales), "type": "expense"},
             {"label": "   - ค่าคนหน้าร้าน (จ-พฤ 460 / ศ-อา 500 บ.)", "amount": kkc_labor, "pct": pct(kkc_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads (เฉพาะแคมเปญขอนแก่น)", "amount": kkc_ads, "pct": pct(kkc_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงใส่สินค้า (6 บ./ออเดอร์)", "amount": kkc_misc, "pct": pct(kkc_misc, target_sales), "type": "expense"},
@@ -191,7 +196,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": "   - ค่าจิปาถะ/แพ็คของออนไลน์ (3 บ./ออเดอร์)", "amount": online_misc, "pct": pct(online_misc, target_sales), "type": "expense"},
             {"label": "   - ค่าธรรมเนียม COD ออนไลน์ (2.14%)", "amount": online_cod_fee, "pct": pct(online_cod_fee, target_sales), "type": "expense"},
             {"label": "5. ค่าใช้จ่ายหน้าร้านเซนทรัล KKC (KKC Expenses):", "amount": kkc_expenses, "pct": pct(kkc_expenses, target_sales), "type": "header", "bold": True},
-            {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล KKC ({kkc_rent_rate:,.2f} บ./วัน)", "amount": kkc_rent, "pct": pct(kkc_rent, target_sales), "type": "expense"},
+            {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล KKC ({kkc_rent_desc})", "amount": kkc_rent, "pct": pct(kkc_rent, target_sales), "type": "expense"},
             {"label": "   - ค่าคนหน้าร้านเซนทรัล KKC (460/500 บ.)", "amount": kkc_labor, "pct": pct(kkc_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads หน้าร้าน KKC", "amount": kkc_ads, "pct": pct(kkc_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน KKC (6 บ./ออเดอร์)", "amount": kkc_misc, "pct": pct(kkc_misc, target_sales), "type": "expense"},
@@ -301,7 +306,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
 
         d_kkc_labor = kkc_labor_weekend if d.weekday() in [4, 5, 6] else kkc_labor_weekday
         d_kkc_exp = (
-            kkc_rent_rate +
+            get_kkc_daily_rent(d) +
             d_kkc_labor +
             (len(d_kkc_orders) * kkc_misc_rate) +
             kkc_ads_val

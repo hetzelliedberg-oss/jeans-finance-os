@@ -212,7 +212,8 @@ def init_db():
         "ONLINE_MISC_PER_ORDER": "3.0",      # 3 THB / order
         "ONLINE_COD_FEE_PCT": "2.14",        # 2.14%
 
-        "KKC_RENT_DAILY": "910.0",           # 910.00 THB / day per user requirement
+        "KKC_RENT_MONTHLY": "27214.0",       # Contract 27,214 THB / month
+        "KKC_RENT_DAILY": "877.87",          # 27,214 / 31 = 877.87 THB / day
         "KKC_LABOR_WEEKDAY": "460.0",        # Mon-Thu 460 THB / day
         "KKC_LABOR_WEEKEND": "500.0",        # Fri-Sun 500 THB / day
         "KKC_MISC_PER_ORDER": "6.0",         # 6 THB / order bag
