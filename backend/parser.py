@@ -24,6 +24,8 @@ def normalize_sku(raw_sku: str) -> str:
         clean = "XRP" + clean[2:]
     elif clean.startswith("XR") and not clean.startswith("XRP"):
         clean = "XRP" + clean[2:]
+    elif clean.startswith("JR"):
+        clean = "JA" + clean[2:]
     # Handle Thai suffix like ขาว
     if "ขาว" in raw_sku:
         clean = clean.replace("ขาว", "") + "ขาว"
@@ -136,8 +138,8 @@ def parse_order_items(text: str, sku_cost_map: Dict[str, float]) -> List[Dict[st
     """Extract individual items (SKU, Size, Color, Qty) from message text"""
     items = []
 
-    # Regular expression for matching SKU like AR01, XRP67, AR-189, XRP 55, AR23ขาว, XP70, XR67
-    sku_pattern = re.compile(r"(?:^|[^a-zA-Z0-9])(AR|XRP|XP|XR)[-_ ]?(\d+)([a-zA-Zก-๙]*)", re.IGNORECASE)
+    # Regular expression for matching SKU like AR01, XRP67, JA001, AR-189, XRP 55, AR23ขาว, XP70, XR67, JR001
+    sku_pattern = re.compile(r"(?:^|[^a-zA-Z0-9])(AR|XRP|XP|XR|JA|JR)[-_ ]?(\d+)([a-zA-Zก-๙]*)", re.IGNORECASE)
     size_pattern = re.compile(r"\b(2XL|3XL|4XL|XXL|XXXL|FS|FreeSize|ฟรีไซส์|[SMLX]{1,3}|2[4-9]|3[0-9]|4[0-4])\b", re.IGNORECASE)
     size_word_pattern = re.compile(r"(?:ไซส์|size|เอว)\s*[:=]?\s*([0-9a-zA-Z]+)", re.IGNORECASE)
     color_pattern = re.compile(r"(ยีนส์เข้ม|ยีนส์อ่อน|ยีนส์ฟอก|ยีนส์กลาง|ยีนส์ดำ|สีขาว|สียีนส์|สีดำ|ขาว|ดำ|สนิม|มิดไนท์|เข้ม|อ่อน|ฟอก|เทา)", re.IGNORECASE)
@@ -162,6 +164,8 @@ def parse_order_items(text: str, sku_cost_map: Dict[str, float]) -> List[Dict[st
 
     for i, sm in enumerate(all_sku_matches):
         prefix = sm.group(1).upper()
+        if prefix == "JR":
+            prefix = "JA"
         num = sm.group(2)
         suffix = sm.group(3) or ""
         raw_matched = f"{prefix}{num}{suffix}"
@@ -398,7 +402,7 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
         sz = raw_sizes[idx] if idx < len(raw_sizes) else (raw_sizes[0] if raw_sizes else "Free")
         cost = sku_cost_map.get(sku_norm, 0.0)
         if cost == 0.0:
-            m_base = re.search(r'(AR\d+|XRP\d+)', sku_norm)
+            m_base = re.search(r'(AR\d+|XRP\d+|JA\d+)', sku_norm)
             cost = sku_cost_map.get(m_base.group(1), 350.0) if m_base else 350.0
         items.append({
             "sku": sku_norm,
