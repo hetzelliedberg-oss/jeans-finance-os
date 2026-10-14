@@ -117,7 +117,24 @@ def _backup_db_to_github():
 
 threading.Thread(target=_keepalive_loop, daemon=True, name="keepalive").start()
 threading.Thread(target=_backup_db_to_github, daemon=True, name="db-backup").start()
+
+def _auto_cloud_sync_loop():
+    """If running locally on PC or Mac, auto-pull latest data from Central Cloud Hub every 5 min"""
+    if "onrender.com" in RENDER_URL:
+        return
+    time.sleep(10)
+    print("[AutoSync] Local machine active → auto-syncing with Central Cloud Hub every 5 min...", flush=True)
+    while True:
+        try:
+            from hub_sync import pull_from_cloud
+            pull_from_cloud()
+        except Exception as e:
+            print(f"[AutoSync] ⚠ {e}", flush=True)
+        time.sleep(300)
+
+threading.Thread(target=_auto_cloud_sync_loop, daemon=True, name="auto-cloud-sync").start()
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 
 # Pydantic models
