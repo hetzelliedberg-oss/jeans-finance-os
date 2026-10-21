@@ -80,6 +80,15 @@ def pull_from_cloud():
             """, (o.get('order_date'), o.get('total_pieces'), o.get('total_sales'), o.get('cogs_total'), o.get('status'), oid))
             updated += 1
 
+        # Sync items
+        c.execute("DELETE FROM order_items WHERE order_id = ?", (oid,))
+        for it in o.get('items', []):
+            c.execute("""
+                INSERT INTO order_items (order_id, sku, size, color, quantity, unit_cost, total_cost)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (oid, it.get('sku', ''), it.get('size', ''), it.get('color', ''), it.get('quantity', 1), it.get('unit_cost', 0.0), it.get('total_cost', 0.0)))
+
+
     conn.commit()
     conn.close()
     print(f"✅ Pull Completed: เพิ่มใหม่ {synced} บิล | อัปเดต {updated} บิล เรียบร้อยแล้ว!")
