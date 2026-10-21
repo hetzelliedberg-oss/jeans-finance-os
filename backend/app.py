@@ -123,7 +123,7 @@ def _auto_cloud_sync_loop():
     if "onrender.com" in RENDER_URL:
         return
     time.sleep(10)
-    print("[AutoSync] Local machine active → auto-syncing with Central Cloud Hub every 5 min...", flush=True)
+    print("[AutoSync] Local machine active -> auto-syncing with Central Cloud Hub every 5 min...", flush=True)
     while True:
         try:
             from hub_sync import pull_from_cloud
@@ -153,6 +153,10 @@ class SkuCostItem(BaseModel):
 
 class SettingsUpdateRequest(BaseModel):
     settings: Dict[str, Any]
+
+class ChatRequest(BaseModel):
+    prompt: str
+    api_key: Optional[str] = None
 
 
 class AdsSyncRequest(BaseModel):
@@ -693,6 +697,31 @@ def save_settings(req: SettingsUpdateRequest):
     for k, v in req.settings.items():
         update_setting(k, v)
     return {"success": True, "updated": list(req.settings.keys())}
+
+
+# ---------------- AI CHAT & COMMAND TERMINAL ---------------- #
+from backend.ai_engine import execute_chat_query
+
+@app.post("/api/ai/chat")
+def handle_ai_chat(req: ChatRequest):
+    """Handle natural language prompt from Web UI"""
+    res = execute_chat_query(req.prompt, req.api_key)
+    res["timestamp"] = datetime.now().strftime("%H:%M:%S")
+    return res
+
+
+@app.get("/api/ai/quick-prompts")
+def get_quick_prompts():
+    """Curated executive prompts for fast one-click analysis"""
+    return [
+        {"icon": "bar-chart-3", "label": "สรุปกำไร P&L ต.ค.", "prompt": "สรุปยอดขายเดือนตุลาคมและกำไรสุทธิ"},
+        {"icon": "target", "label": "เช็คแอดโคราช & KKC", "prompt": "เช็คสถานะแอดโคราชกับขอนแก่น วันที่ 20-21 ต.ค."},
+        {"icon": "message-square", "label": "สรุป 71 แชทลูกค้า", "prompt": "สรุปข้อมูลลูกค้า 71 แชท ล่าสุด"},
+        {"icon": "package", "label": "สินค้าขายดี 10 อันดับ", "prompt": "สินค้าตัวไหนขายดีสุด 10 อันดับ"},
+        {"icon": "trending-up", "label": "แผนสเกล 5-10 สาขา", "prompt": "แนะนำแผนขยายสาขา 5-10 สาขา โมเดล Bearbeary"},
+        {"icon": "refresh-cw", "label": "ซิงค์ยอดจาก Cloud", "prompt": "ซิงค์ข้อมูลล่าสุดจาก Cloud"},
+        {"icon": "calculator", "label": "คำนวณต้นทุนใหม่", "prompt": "คำนวณต้นทุนสินค้าใหม่ทั้งหมด"}
+    ]
 
 
 # ---------------- SERVE STATIC FRONTEND ---------------- #
