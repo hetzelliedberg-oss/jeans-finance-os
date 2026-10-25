@@ -41,8 +41,6 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Marked.js for Markdown Rendering -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
   <style>
     body { font-family: 'Prompt', sans-serif; }
@@ -52,18 +50,6 @@
     ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
     ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-    /* Markdown styling in AI Chat */
-    .markdown-body table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.85rem; }
-    .markdown-body th { background-color: #1e293b; color: #f8fafc; padding: 8px 12px; border: 1px solid #334155; text-align: left; font-weight: 600; }
-    .markdown-body td { padding: 8px 12px; border: 1px solid #334155; background-color: #0f172a; color: #cbd5e1; }
-    .markdown-body tr:hover td { background-color: #1e293b; }
-    .markdown-body h3 { font-size: 1.05rem; font-weight: 700; color: #818cf8; margin: 10px 0 6px 0; }
-    .markdown-body h4 { font-size: 0.95rem; font-weight: 600; color: #a5b4fc; margin: 8px 0 4px 0; }
-    .markdown-body ul { list-style-type: disc; margin-left: 20px; margin-bottom: 8px; }
-    .markdown-body ol { list-style-type: decimal; margin-left: 20px; margin-bottom: 8px; }
-    .markdown-body code { background: #1e1b4b; color: #a5b4fc; padding: 2px 6px; border-radius: 4px; font-family: monospace; }
-    .markdown-body pre { background: #020617; border: 1px solid #1e293b; border-radius: 8px; padding: 10px; overflow-x: auto; margin: 8px 0; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
@@ -85,10 +71,6 @@
 
       <!-- Quick Actions -->
       <div class="flex items-center space-x-2">
-        <button onclick="switchTab('ai')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-semibold transition shadow-md shadow-indigo-500/25">
-          <i data-lucide="sparkles" class="w-4 h-4 text-amber-300"></i>
-          <span>🧠 AI Terminal</span>
-        </button>
         <button onclick="openScanModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium transition shadow-sm">
           <i data-lucide="clipboard-paste" class="w-4 h-4"></i>
           <span>สแกนแชท</span>
@@ -145,10 +127,6 @@
           <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
           <span>ตรวจสอบยอด (3-Way Audit)</span>
         </button>
-        <button onclick="switchTab('ai')" id="tab-btn-ai" class="tab-btn px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 bg-gradient-to-r from-purple-950/80 to-indigo-950/80 text-indigo-300 border border-indigo-500/50 hover:bg-indigo-900/60 hover:text-white transition shadow-sm">
-          <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
-          <span>🧠 AI Command & Chat</span>
-        </button>
       </nav>
 
       <!-- CHANNEL SELECTOR & DATE CONTROLS -->
@@ -163,6 +141,10 @@
             <i data-lucide="store" class="w-3.5 h-3.5"></i>
             <span>หน้าร้านเซนทรัล KKC</span>
           </button>
+          <button onclick="setChannel('korat')" id="ch-korat" class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1">
+            <i data-lucide="store" class="w-3.5 h-3.5"></i>
+            <span>หน้าร้านเซนทรัล โคราช</span>
+          </button>
           <button onclick="setChannel('consolidated')" id="ch-consolidated" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">
             <span>งบรวมทั้งบริษัท</span>
           </button>
@@ -170,11 +152,11 @@
 
         <!-- Date Presets with Unique IDs -->
         <div class="flex items-center gap-1 bg-slate-950 px-1.5 py-1 rounded-lg border border-slate-800 text-xs">
-          <button onclick="setDatePreset('today')" id="preset-today" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">วันนี้</button>
-          <button onclick="setDatePreset('yesterday')" id="preset-yesterday" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">เมื่อวาน</button>
-          <button onclick="setDatePreset('7d')" id="preset-7d" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">7 วัน</button>
-          <button onclick="setDatePreset('sep')" id="preset-sep" class="preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition">ก.ย. 26</button>
-          <button onclick="setDatePreset('aug')" id="preset-aug" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">ส.ค. 26</button>
+          <button onclick="setDatePreset('today')" id="preset-today" class="preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition">วันนี้ (25 ต.ค.)</button>
+          <button onclick="setDatePreset('yesterday')" id="preset-yesterday" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">เมื่อวาน (24 ต.ค.)</button>
+          <button onclick="setDatePreset('23oct')" id="preset-23oct" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">23 ต.ค. (เปิดร้าน)</button>
+          <button onclick="setDatePreset('oct')" id="preset-oct" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">ทั้งเดือน ต.ค. 26</button>
+          <button onclick="setDatePreset('sep')" id="preset-sep" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">ก.ย. 26</button>
         </div>
 
         <!-- Date Range Inputs with onchange -->
@@ -209,7 +191,7 @@
           <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></span>
           <span id="activePeriodText">กำลังโหลด...</span>
         </div>
-        <button onclick="setDatePreset('sep')" class="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium">ดูทั้งเดือน ก.ย.</button>
+        <button onclick="setDatePreset('oct')" class="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium">ดูทั้งเดือน ต.ค. 26</button>
       </div>
     </div>
   </div>
@@ -437,12 +419,13 @@
                 <th class="py-3 px-3">#</th>
                 <th class="py-3 px-3">วันที่/เวลา</th>
                 <th class="py-3 px-3">ช่องทาง</th>
-                <th class="py-3 px-3">แอดมิน/ผู้ขาย</th>
+                <th class="py-3 px-3">ลูกค้า / ที่มา</th>
                 <th class="py-3 px-3">สินค้า / ไซส์</th>
                 <th class="py-3 px-3 text-center">ชำระเงิน</th>
                 <th class="py-3 px-3 text-right">ยอดขาย (บ.)</th>
-                <th class="py-3 px-3 text-right">ต้นทุน (บ.)</th>
-                <th class="py-3 px-3">ข้อความดิบ</th>
+                <th class="py-3 px-3 text-right">ต้นทุน COGS</th>
+                <th class="py-3 px-3 text-right">กำไรขั้นต้น</th>
+                <th class="py-3 px-3">ข้อความดิบ Telegram</th>
               </tr>
             </thead>
             <tbody id="ordersTableBody" class="divide-y divide-slate-800">
@@ -757,120 +740,6 @@
       </div>
     </div>
 
-    <!-- TAB 7: AI EXECUTIVE TERMINAL -->
-    <div id="tab-content-ai" class="space-y-4 hidden max-w-6xl mx-auto">
-      <!-- Header Banner -->
-      <div class="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-purple-950/40 border border-indigo-500/30 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div class="flex items-center gap-3.5">
-          <div class="w-12 h-12 rounded-xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
-            <i data-lucide="bot" class="w-7 h-7 text-white"></i>
-          </div>
-          <div>
-            <div class="flex items-center gap-2">
-              <h2 class="text-base font-bold text-white tracking-tight">Jeans Around AI Executive Terminal</h2>
-              <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-semibold border border-emerald-500/30 flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Local Brain Active
-              </span>
-            </div>
-            <p class="text-xs text-slate-300 mt-0.5">
-              สั่งการและวิเคราะห์ธุรกิจแบบ Real-time ผ่าน Local PC (รองรับ Mac M1, iPad, iPhone เต็มจอ)
-            </p>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 text-xs">
-          <span class="px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-700/60 text-slate-300 font-mono flex items-center gap-1.5">
-            <i data-lucide="database" class="w-3.5 h-3.5 text-indigo-400"></i>
-            <span>302 Orders (Oct)</span>
-          </span>
-          <button onclick="clearAiChat()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition flex items-center gap-1">
-            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-            <span>ล้างแชท</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick Prompt Chips Carousel -->
-      <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
-        <span class="text-[11px] font-semibold text-slate-400 shrink-0 uppercase tracking-wider flex items-center gap-1">
-          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i> Prompt ลัด:
-        </span>
-        <button onclick="sendQuickPrompt('สรุปยอดขายเดือนตุลาคมและกำไรสุทธิ')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>📊</span> สรุป P&L ต.ค.
-        </button>
-        <button onclick="sendQuickPrompt('เช็คสถานะแอดโคราชกับขอนแก่น วันที่ 20-21 ต.ค.')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>🎯</span> เช็คแอดโคราช & KKC
-        </button>
-        <button onclick="sendQuickPrompt('สรุปข้อมูลลูกค้า 71 แชท ล่าสุด')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>💬</span> สรุป 71 แชทลูกค้า
-        </button>
-        <button onclick="sendQuickPrompt('สินค้าตัวไหนขายดีสุด 10 อันดับ')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>👖</span> สินค้าขายดี Top 10
-        </button>
-        <button onclick="sendQuickPrompt('แนะนำแผนขยายสาขา 5-10 สาขา โมเดล Bearbeary')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>🚀</span> แผนสเกล 5-10 สาขา
-        </button>
-        <button onclick="sendQuickPrompt('ซิงค์ข้อมูลล่าสุดจาก Cloud')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>🔄</span> ซิงค์ยอดจาก Cloud
-        </button>
-        <button onclick="sendQuickPrompt('คำนวณต้นทุนสินค้าใหม่ทั้งหมด')" class="px-3 py-1.5 rounded-full bg-slate-900 hover:bg-indigo-600 hover:text-white border border-slate-700 text-slate-300 text-xs transition shrink-0 flex items-center gap-1.5">
-          <span>🧮</span> คำนวณต้นทุนใหม่
-        </button>
-      </div>
-
-      <!-- Main Chat Terminal Box -->
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl flex flex-col h-[650px] shadow-2xl overflow-hidden">
-        <!-- Messages Area -->
-        <div id="aiChatMessages" class="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-          <!-- Welcome Message -->
-          <div class="flex items-start gap-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-md">
-              <i data-lucide="bot" class="w-5 h-5 text-white"></i>
-            </div>
-            <div class="bg-slate-950 border border-slate-800 rounded-2xl rounded-tl-none p-4 max-w-2xl text-xs sm:text-sm text-slate-200 leading-relaxed shadow-sm">
-              <div class="font-bold text-indigo-400 mb-1 flex items-center gap-1.5">
-                <span>Jeans Around AI Terminal</span>
-                <span class="text-[10px] text-slate-500 font-normal">ระบบพร้อมใช้งาน</span>
-              </div>
-              <p>สวัสดีครับ! ผมคือ AI Executive Terminal เชื่อมต่อกับเครื่อง Local PC ของคุณโดยตรง</p>
-              <p class="mt-2 text-slate-300">
-                คุณสามารถพิมพ์ Prompt วิเคราะห์ยอดขาย, เช็คสถานะแอดโคราช/ขอนแก่น, สรุปแชทลูกค้า, รันคำนวณต้นทุน หรือสั่งซิงค์ข้อมูลได้ทันทีครับ!
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Input Area -->
-        <div class="border-t border-slate-800 bg-slate-950 p-3 sm:p-4">
-          <form id="aiPromptForm" onsubmit="handleAiPromptSubmit(event)" class="flex items-end gap-2">
-            <div class="relative flex-1">
-              <textarea 
-                id="aiPromptInput" 
-                rows="2" 
-                placeholder="พิมพ์คำสั่งหรือถามคำถามธุรกิจที่นี่... (เช่น สรุปยอดขายตุลาคม, เช็คแอดโคราช, ซิงค์ยอด)" 
-                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 resize-none transition"
-                onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); handleAiPromptSubmit(event); }"
-              ></textarea>
-            </div>
-            <button 
-              type="submit" 
-              id="aiSubmitBtn"
-              class="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium text-xs sm:text-sm flex items-center gap-1.5 transition shadow-lg shadow-indigo-600/30 shrink-0"
-            >
-              <span>ส่ง</span>
-              <i data-lucide="send" class="w-4 h-4"></i>
-            </button>
-          </form>
-          <div class="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-1">
-            <span>กด <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">Enter</kbd> เพื่อส่ง, <kbd class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">Shift + Enter</kbd> เพื่อขึ้นบรรทัดใหม่</span>
-            <span class="flex items-center gap-1">
-              <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-              <span>Host: 192.168.1.109:8055</span>
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
   </main>
 
   <!-- MODAL 1: SCAN PASTED TEXT MODAL -->
@@ -892,6 +761,7 @@
           <select id="scanChannel" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
             <option value="online">💻 ออนไลน์ ออฟฟิต (Online Office)</option>
             <option value="kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+            <option value="korat">🏬 หน้าร้านเซนทรัล โคราช</option>
           </select>
         </div>
         <div>
@@ -1292,7 +1162,10 @@ xrp55 2 ตัว
     });
 
     function initTodayDates() {
-      const today = new Date();
+      let today = new Date();
+      if (today.getFullYear() < 2026) {
+        today = new Date(2026, 9, 25);
+      }
       const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const todayStr = fmt(today);
       const monthStart = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -1369,163 +1242,13 @@ xrp55 2 ตัว
       else if (tabId === "costs") loadCostMasterTab();
       else if (tabId === "audit") loadAuditTab();
       else if (tabId === "settings") loadSettings();
-      else if (tabId === "ai") initAiChatTab();
 
       lucide.createIcons();
-    }
-
-    // ---------------- AI EXECUTIVE TERMINAL JS ---------------- //
-    function initAiChatTab() {
-      lucide.createIcons();
-      setTimeout(() => {
-        const input = document.getElementById('aiPromptInput');
-        if (input) input.focus();
-      }, 100);
-    }
-
-    function clearAiChat() {
-      const container = document.getElementById('aiChatMessages');
-      if (container) {
-        container.innerHTML = `
-          <div class="flex items-start gap-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-md">
-              <i data-lucide="bot" class="w-5 h-5 text-white"></i>
-            </div>
-            <div class="bg-slate-950 border border-slate-800 rounded-2xl rounded-tl-none p-4 max-w-2xl text-xs sm:text-sm text-slate-200 leading-relaxed shadow-sm">
-              <div class="font-bold text-indigo-400 mb-1 flex items-center gap-1.5">
-                <span>Jeans Around AI Terminal</span>
-                <span class="text-[10px] text-slate-500 font-normal">แชทถูกล้างแล้ว</span>
-              </div>
-              <p>ประวัติการสนทนาถูกล้างเรียบร้อยครับ สามารถเริ่มพิมพ์ Prompt ใหม่ได้ทันที!</p>
-            </div>
-          </div>
-        `;
-        lucide.createIcons();
-      }
-    }
-
-    function sendQuickPrompt(promptText) {
-      const input = document.getElementById('aiPromptInput');
-      if (input) {
-        input.value = promptText;
-        handleAiPromptSubmit(new Event('submit'));
-      }
-    }
-
-    async function handleAiPromptSubmit(e) {
-      if (e && e.preventDefault) e.preventDefault();
-      const input = document.getElementById('aiPromptInput');
-      const btn = document.getElementById('aiSubmitBtn');
-      const prompt = (input.value || '').trim();
-      if (!prompt) return;
-
-      // Clear input
-      input.value = '';
-
-      const container = document.getElementById('aiChatMessages');
-
-      // Render User Message
-      const userHtml = `
-        <div class="flex items-start gap-3 justify-end">
-          <div class="bg-indigo-600 text-white rounded-2xl rounded-tr-none px-4 py-2.5 max-w-xl text-xs sm:text-sm shadow-md">
-            <p class="whitespace-pre-wrap">${escapeHtml(prompt)}</p>
-          </div>
-          <div class="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0 text-white font-bold text-xs">
-            ME
-          </div>
-        </div>
-      `;
-      container.insertAdjacentHTML('beforeend', userHtml);
-
-      // Render Loading Placeholder
-      const loadingId = 'ai-loading-' + Date.now();
-      const loadingHtml = `
-        <div id="${loadingId}" class="flex items-start gap-3">
-          <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-md">
-            <i data-lucide="bot" class="w-5 h-5 text-white"></i>
-          </div>
-          <div class="bg-slate-950 border border-slate-800 rounded-2xl rounded-tl-none p-4 max-w-xl text-xs sm:text-sm text-slate-400 flex items-center gap-2">
-            <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-indigo-400"></i>
-            <span>กำลังดึงข้อมูลสดจากฐานข้อมูลและประมวลผลคำตอบ...</span>
-          </div>
-        </div>
-      `;
-      container.insertAdjacentHTML('beforeend', loadingHtml);
-      lucide.createIcons();
-      container.scrollTop = container.scrollHeight;
-
-      btn.disabled = true;
-
-      try {
-        const res = await fetch('/api/ai/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: prompt })
-        });
-        const data = await res.json();
-
-        // Remove loading
-        const loadEl = document.getElementById(loadingId);
-        if (loadEl) loadEl.remove();
-
-        // Render AI Reply
-        const formattedReply = window.marked ? marked.parse(data.reply || '') : (data.reply || '');
-        const aiHtml = `
-          <div class="flex items-start gap-3">
-            <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-md mt-1">
-              <i data-lucide="bot" class="w-5 h-5 text-white"></i>
-            </div>
-            <div class="bg-slate-950 border border-slate-800/90 rounded-2xl rounded-tl-none p-4 sm:p-5 max-w-3xl text-xs sm:text-sm text-slate-200 leading-relaxed shadow-lg markdown-body">
-              ${formattedReply}
-              <div class="text-[10px] text-slate-500 mt-3 pt-2 border-t border-slate-800/60 flex items-center justify-between">
-                <span>⚡ ตอบโดย Jeans Around AI Engine</span>
-                <span>${data.timestamp || new Date().toLocaleTimeString()}</span>
-              </div>
-            </div>
-          </div>
-        `;
-        container.insertAdjacentHTML('beforeend', aiHtml);
-        lucide.createIcons();
-        container.scrollTop = container.scrollHeight;
-
-        // If action was executed, refresh P&L or table if applicable
-        if (data.action_executed === 'recalculate_cogs' || data.action_executed === 'sync_hub_pull') {
-          if (typeof loadCurrentReport === 'function') loadCurrentReport();
-        }
-
-      } catch (err) {
-        const loadEl = document.getElementById(loadingId);
-        if (loadEl) loadEl.remove();
-
-        const errHtml = `
-          <div class="flex items-start gap-3">
-            <div class="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center shrink-0 shadow-md">
-              <i data-lucide="alert-triangle" class="w-5 h-5 text-white"></i>
-            </div>
-            <div class="bg-red-950/40 border border-red-800 rounded-2xl rounded-tl-none p-4 max-w-xl text-xs sm:text-sm text-red-200">
-              <p class="font-bold">เกิดข้อผิดพลาดในการเชื่อมต่อ:</p>
-              <p class="mt-1">${err.message}</p>
-            </div>
-          </div>
-        `;
-        container.insertAdjacentHTML('beforeend', errHtml);
-        lucide.createIcons();
-        container.scrollTop = container.scrollHeight;
-      } finally {
-        btn.disabled = false;
-        input.focus();
-      }
-    }
-
-    function escapeHtml(text) {
-      if (!text) return '';
-      const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
-      return text.replace(/[&<>"']/g, m => map[m]);
     }
 
     function setChannel(ch) {
       currentChannel = ch;
-      ['online', 'kkc', 'consolidated'].forEach(c => {
+      ['online', 'kkc', 'korat', 'consolidated'].forEach(c => {
         const btn = document.getElementById(`ch-${c}`);
         if (btn) {
           if (c === ch) {
@@ -1536,6 +1259,7 @@ xrp55 2 ตัว
         }
       });
       loadCurrentReport();
+      if (currentTab === 'orders') loadOrdersTab();
     }
 
     function setDatePreset(preset) {
@@ -1553,43 +1277,35 @@ xrp55 2 ตัว
         c.className = "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
       });
 
-      const now = new Date();
-      let start = new Date(now.getFullYear(), now.getMonth(), 1);
-      let end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let startStr = "2026-10-25";
+      let endStr = "2026-10-25";
 
       if (preset === 'today') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        startStr = "2026-10-25";
+        endStr = "2026-10-25";
       } else if (preset === 'yesterday') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+        startStr = "2026-10-24";
+        endStr = "2026-10-24";
+      } else if (preset === '23oct') {
+        startStr = "2026-10-23";
+        endStr = "2026-10-23";
+      } else if (preset === 'oct') {
+        startStr = "2026-10-01";
+        endStr = "2026-10-31";
       } else if (preset === '7d') {
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        startStr = "2026-10-19";
+        endStr = "2026-10-25";
       } else if (preset === 'sep') {
-        start = new Date(now.getFullYear(), 8, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      } else if (preset === 'aug') {
-        start = new Date(now.getFullYear(), 7, 1);
-        end = new Date(now.getFullYear(), 7, 31);
+        startStr = "2026-09-01";
+        endStr = "2026-09-30";
       }
 
+      document.getElementById("inputStartDate").value = startStr;
+      document.getElementById("inputEndDate").value = endStr;
 
-      const formatDate = (d) => {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-
-      const sFormatted = formatDate(start);
-      const eFormatted = formatDate(end);
-      document.getElementById("inputStartDate").value = sFormatted;
-      document.getElementById("inputEndDate").value = eFormatted;
-
-      if (sFormatted === eFormatted) {
+      if (startStr === endStr) {
         document.querySelectorAll('.day-chip').forEach(c => {
-          if (c.getAttribute('data-date') === sFormatted) {
+          if (c.getAttribute('data-date') === startStr) {
             c.className = "day-chip px-2 py-0.5 rounded text-white bg-indigo-600 border border-indigo-500 font-bold shadow-sm transition";
           }
         });
@@ -1597,6 +1313,7 @@ xrp55 2 ตัว
 
       updateActivePeriodBadge();
       loadCurrentReport();
+      if (currentTab === 'orders') loadOrdersTab();
     }
 
 
@@ -1615,6 +1332,7 @@ xrp55 2 ตัว
       document.getElementById("inputEndDate").value = dateStr;
       updateActivePeriodBadge();
       loadCurrentReport();
+      if (currentTab === 'orders') loadOrdersTab();
     }
 
     function handleDateChange() {
@@ -1626,6 +1344,7 @@ xrp55 2 ตัว
       });
       updateActivePeriodBadge();
       loadCurrentReport();
+      if (currentTab === 'orders') loadOrdersTab();
     }
 
     function updateActivePeriodBadge() {
@@ -1646,7 +1365,7 @@ xrp55 2 ตัว
       const end = document.getElementById("inputEndDate").value;
       updateActivePeriodBadge();
 
-      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : 'งบรวมทั้งบริษัท');
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : 'งบรวมทั้งบริษัท'));
       document.getElementById("pnlPeriodSubtitle").innerText = `ช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel}`;
 
       try {
@@ -1657,6 +1376,7 @@ xrp55 2 ตัว
         if (currentTab === 'admins') renderAdminsTab();
         else if (currentTab === 'skus') renderSkusTab();
         else if (currentTab === 'audit') loadAuditTab();
+        else if (currentTab === 'orders') loadOrdersTab();
       } catch (err) {
         console.error("Failed to load P&L:", err);
       }
@@ -1836,7 +1556,7 @@ xrp55 2 ตัว
       if (!data) return;
       const start = document.getElementById("inputStartDate").value;
       const end = document.getElementById("inputEndDate").value;
-      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : 'งบรวมทั้งบริษัท');
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : 'งบรวมทั้งบริษัท'));
       const subEl = document.getElementById("adminsPeriodSubtitle");
       if (subEl) {
         if (start === end) {
@@ -1930,26 +1650,36 @@ xrp55 2 ตัว
           const tr = document.createElement("tr");
           tr.className = "hover:bg-slate-800/40 transition text-xs";
 
-          const channelBadge = o.source_channel === "online" 
-            ? `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">ออนไลน์</span>`
-            : `<span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">หน้าร้าน KKC</span>`;
+          let channelBadge = `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">ออนไลน์</span>`;
+          if (o.source_channel === "korat" || o.source_channel === "storefront_korat") {
+            channelBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">🏬 โคราช</span>`;
+          } else if (o.source_channel === "kkc" || o.source_channel === "storefront_kkc") {
+            channelBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold">🏬 ขอนแก่น</span>`;
+          }
 
-          const paymentBadge = o.payment_method === "ปลายทาง"
-            ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-medium">ปลายทาง</span>`
-            : `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">โอน</span>`;
+          let paymentBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">โอนเงิน</span>`;
+          if (o.payment_method === "ปลายทาง") {
+            paymentBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-medium">ปลายทาง COD</span>`;
+          } else if (o.payment_method === "เงินสด") {
+            paymentBadge = `<span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-medium">เงินสด Cash</span>`;
+          }
 
-          const itemsText = o.items.map(it => `${it.sku} (${it.size || '-'}) x${it.quantity}`).join(", ");
+          const itemsText = o.items.map(it => `<span class="inline-block bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 text-indigo-300 font-mono font-medium mr-1 mb-0.5">${it.sku} (${it.size || '-'}) x${it.quantity}</span>`).join("");
+
+          const custName = o.customer_name ? `<span class="text-white font-medium">${o.customer_name}</span>` : `<span class="text-slate-400">${o.sender_name || '-'}</span>`;
+          const grossProfit = (Number(o.total_sales || 0) - Number(o.cogs_total || 0));
 
           tr.innerHTML = `
             <td class="py-3 px-3 text-slate-500 font-mono">#${o.id}</td>
-            <td class="py-3 px-3 text-slate-300 font-mono">${o.order_date}<br><span class="text-[10px] text-slate-500">${o.order_time ? o.order_time.slice(11) : ''}</span></td>
-            <td class="py-3 px-3">${channelBadge}</td>
-            <td class="py-3 px-3 font-medium text-slate-200">${o.sender_name || 'แอดมิน'}</td>
-            <td class="py-3 px-3 font-mono text-indigo-300">${itemsText}</td>
-            <td class="py-3 px-3 text-center">${paymentBadge}</td>
-            <td class="py-3 px-3 text-right font-mono font-bold text-white">฿${formatNumber(o.total_sales)}</td>
-            <td class="py-3 px-3 text-right font-mono text-amber-400">฿${formatNumber(o.cogs_total)}</td>
-            <td class="py-3 px-3 text-slate-400 max-w-xs truncate" title="${o.raw_text.replace(/"/g, '&quot;')}">${o.raw_text}</td>
+            <td class="py-3 px-3 text-slate-300 font-mono whitespace-nowrap">${o.order_date}<br><span class="text-[10px] text-slate-500">${o.order_time ? o.order_time.slice(11) : ''}</span></td>
+            <td class="py-3 px-3 whitespace-nowrap">${channelBadge}</td>
+            <td class="py-3 px-3 max-w-[180px] truncate" title="${o.customer_name || ''}">${custName}</td>
+            <td class="py-3 px-3">${itemsText}</td>
+            <td class="py-3 px-3 text-center whitespace-nowrap">${paymentBadge}</td>
+            <td class="py-3 px-3 text-right font-mono font-bold text-white whitespace-nowrap">฿${formatNumber(o.total_sales)}</td>
+            <td class="py-3 px-3 text-right font-mono text-amber-400 whitespace-nowrap">฿${formatNumber(o.cogs_total)}</td>
+            <td class="py-3 px-3 text-right font-mono text-emerald-400 font-medium whitespace-nowrap">฿${formatNumber(grossProfit)}</td>
+            <td class="py-3 px-3 text-slate-400 max-w-xs truncate" title="${(o.raw_text || '').replace(/"/g, '&quot;')}">${o.raw_text || '-'}</td>
           `;
           tbody.appendChild(tr);
         });
@@ -2075,7 +1805,7 @@ xrp55 2 ตัว
     // ---------------- MODAL 1: SCAN PASTED TEXT ---------------- //
     function openScanModal() {
       document.getElementById("scanDate").value = document.getElementById("inputStartDate").value;
-      document.getElementById("scanChannel").value = currentChannel === 'kkc' ? 'kkc' : 'online';
+      document.getElementById("scanChannel").value = (currentChannel === 'kkc' || currentChannel === 'korat') ? currentChannel : 'online';
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("scanModal").classList.add("flex");
     }
@@ -2269,7 +1999,7 @@ xrp55 2 ตัว
       if (!recData) return;
       const subEl = document.getElementById("reconcileSubtitle");
       if (subEl) {
-        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : 'งบรวม');
+        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : (currentChannel === 'korat' ? 'หน้าร้าน โคราช' : 'งบรวม'));
         subEl.innerText = `เปรียบเทียบยอดขายรายวันระหว่างฐานข้อมูลแชทกับไฟล์ปิดวัน OneDrive • ช่วง: ${recData.date_range.start} ถึง ${recData.date_range.end} • ช่องทาง: ${chName}`;
       }
 
