@@ -55,21 +55,29 @@ def fetch_and_sync_fb_ads(since_date: str, until_date: str) -> Dict[str, Any]:
                 daily_breakdown[date_str] = {
                     "online_spend": 0.0,
                     "kkc_spend": 0.0,
+                    "korat_spend": 0.0,
                     "total_spend": 0.0,
                     "campaigns": []
                 }
 
-            is_kkc = "ขอนแก่น" in c_name
-            if is_kkc:
+            is_korat = "โคราช" in c_name or "korat" in c_name.lower()
+            is_kkc = "ขอนแก่น" in c_name or "kkc" in c_name.lower()
+
+            if is_korat:
+                channel = "korat"
+                daily_breakdown[date_str]["korat_spend"] += spend
+            elif is_kkc:
+                channel = "kkc"
                 daily_breakdown[date_str]["kkc_spend"] += spend
             else:
+                channel = "online"
                 daily_breakdown[date_str]["online_spend"] += spend
 
             daily_breakdown[date_str]["total_spend"] += spend
             daily_breakdown[date_str]["campaigns"].append({
                 "campaign_name": c_name,
                 "spend": spend,
-                "channel": "kkc" if is_kkc else "online"
+                "channel": channel
             })
 
         # Save to DB
@@ -79,12 +87,13 @@ def fetch_and_sync_fb_ads(since_date: str, until_date: str) -> Dict[str, Any]:
 
         for d_str, v in daily_breakdown.items():
             cur.execute("""
-                INSERT OR REPLACE INTO daily_fb_ads (date, online_spend, kkc_spend, total_spend, campaign_details, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO daily_fb_ads (date, online_spend, kkc_spend, korat_spend, total_spend, campaign_details, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
                 d_str,
                 round(v["online_spend"], 2),
                 round(v["kkc_spend"], 2),
+                round(v.get("korat_spend", 0.0), 2),
                 round(v["total_spend"], 2),
                 json.dumps(v["campaigns"], ensure_ascii=False),
                 now_str
@@ -112,6 +121,7 @@ def get_fb_ads_summary(since_date: str, until_date: str) -> Dict[str, Any]:
             COUNT(date) as days,
             COALESCE(SUM(online_spend), 0.0) as total_online_spend,
             COALESCE(SUM(kkc_spend), 0.0) as total_kkc_spend,
+            COALESCE(SUM(korat_spend), 0.0) as total_korat_spend,
             COALESCE(SUM(total_spend), 0.0) as total_spend
         FROM daily_fb_ads
         WHERE date >= ? AND date <= ?
@@ -123,6 +133,7 @@ def get_fb_ads_summary(since_date: str, until_date: str) -> Dict[str, Any]:
         "days": row["days"],
         "online_spend": round(row["total_online_spend"], 2),
         "kkc_spend": round(row["total_kkc_spend"], 2),
+        "korat_spend": round(row["total_korat_spend"], 2),
         "total_spend": round(row["total_spend"], 2)
     }
 
