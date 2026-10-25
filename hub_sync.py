@@ -9,10 +9,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 API_BASE = os.environ.get("JEANS_HUB_API", "https://jeans-finance-os.onrender.com/api")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "finance_hub.db")
 
+from backend.database import get_db_connection
+
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return get_db_connection()
 
 def check_status():
     print(f"📡 Checking Central Cloud Hub ({API_BASE}) vs Local DB ({DB_PATH})...\n")
@@ -38,59 +38,55 @@ def check_status():
         print("\n⚠️ STATUS: มีความแตกต่างระหว่าง Local กับ Cloud Hub (แนะนำให้รัน pull หรือ push)")
 
 def pull_from_cloud():
-    print(f"⬇️ Pulling latest orders from Central Cloud Hub ({API_BASE})...")
-    try:
-        r = requests.get(f"{API_BASE}/orders", params={'limit': 1000}, timeout=20)
-        orders = r.json().get('orders', [])
-    except Exception as e:
-        print(f"❌ Failed to fetch orders from Cloud Hub: {e}")
-        return
+    print("⬇️ Pull from cloud is permanently disabled to prevent overwriting local audited orders.")
+    return
 
     conn = get_db()
     c = conn.cursor()
     synced = 0
     updated = 0
 
-    for o in orders:
-        oid = o['id']
-        c.execute("SELECT id FROM orders WHERE id = ?", (oid,))
-        row = c.fetchone()
-        if not row:
-            c.execute("""
-                INSERT INTO orders (
-                    id, source_channel, message_id, sender_name, order_date, order_time,
-                    raw_text, total_pieces, total_sales, payment_method, cod_amount,
-                    transfer_amount, cogs_total, commission_amount, status, created_at,
-                    customer_name, platform
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                oid, o.get('source_channel'), o.get('message_id'), o.get('sender_name'),
-                o.get('order_date'), o.get('order_time'), o.get('raw_text'),
-                o.get('total_pieces'), o.get('total_sales'), o.get('payment_method'),
-                o.get('cod_amount'), o.get('transfer_amount'), o.get('cogs_total'),
-                o.get('commission_amount'), o.get('status'), o.get('created_at'),
-                o.get('customer_name'), o.get('platform')
-            ))
-            synced += 1
-        else:
-            c.execute("""
-                UPDATE orders SET
-                    order_date = ?, total_pieces = ?, total_sales = ?, cogs_total = ?, status = ?
-                WHERE id = ?
-            """, (o.get('order_date'), o.get('total_pieces'), o.get('total_sales'), o.get('cogs_total'), o.get('status'), oid))
-            updated += 1
+    try:
+        for o in orders:
+            oid = o['id']
+            c.execute("SELECT id FROM orders WHERE id = ?", (oid,))
+            row = c.fetchone()
+            if not row:
+                c.execute("""
+                    INSERT OR IGNORE INTO orders (
+                        id, source_channel, message_id, sender_name, order_date, order_time,
+                        raw_text, total_pieces, total_sales, payment_method, cod_amount,
+                        transfer_amount, cogs_total, commission_amount, status, created_at,
+                        customer_name, platform
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    oid, o.get('source_channel'), o.get('message_id'), o.get('sender_name'),
+                    o.get('order_date'), o.get('order_time'), o.get('raw_text'),
+                    o.get('total_pieces'), o.get('total_sales'), o.get('payment_method'),
+                    o.get('cod_amount'), o.get('transfer_amount'), o.get('cogs_total'),
+                    o.get('commission_amount'), o.get('status'), o.get('created_at'),
+                    o.get('customer_name'), o.get('platform')
+                ))
+                synced += 1
+            else:
+                c.execute("""
+                    UPDATE orders SET
+                        order_date = ?, total_pieces = ?, total_sales = ?, cogs_total = ?, status = ?
+                    WHERE id = ?
+                """, (o.get('order_date'), o.get('total_pieces'), o.get('total_sales'), o.get('cogs_total'), o.get('status'), oid))
+                updated += 1
 
-        # Sync items
-        c.execute("DELETE FROM order_items WHERE order_id = ?", (oid,))
-        for it in o.get('items', []):
-            c.execute("""
-                INSERT INTO order_items (order_id, sku, size, color, quantity, unit_cost, total_cost)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (oid, it.get('sku', ''), it.get('size', ''), it.get('color', ''), it.get('quantity', 1), it.get('unit_cost', 0.0), it.get('total_cost', 0.0)))
+            # Sync items
+            c.execute("DELETE FROM order_items WHERE order_id = ?", (oid,))
+            for it in o.get('items', []):
+                c.execute("""
+                    INSERT INTO order_items (order_id, sku, size, color, quantity, unit_cost, total_cost)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, (oid, it.get('sku', ''), it.get('size', ''), it.get('color', ''), it.get('quantity', 1), it.get('unit_cost', 0.0), it.get('total_cost', 0.0)))
 
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        conn.close()
     print(f"✅ Pull Completed: เพิ่มใหม่ {synced} บิล | อัปเดต {updated} บิล เรียบร้อยแล้ว!")
 
 def push_to_cloud():
