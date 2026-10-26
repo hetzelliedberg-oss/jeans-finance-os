@@ -50,12 +50,12 @@ class TelethonManager:
             api_id, api_hash = self._get_credentials()
             settings = get_settings()
             string_session = settings.get("TELETHON_STRING_SESSION", "").strip() if not force_new else ""
-            if string_session:
+            if string_session and string_session != "None":
                 self.client = TelegramClient(StringSession(string_session), api_id, api_hash, loop=self.loop)
             elif os.path.exists(SESSION_PATH + ".session") and not force_new:
                 self.client = TelegramClient(SESSION_PATH, api_id, api_hash, loop=self.loop)
             else:
-                self.client = TelegramClient(StringSession(""), api_id, api_hash, loop=self.loop)
+                self.client = TelegramClient(SESSION_PATH, api_id, api_hash, loop=self.loop)
 
         if not self.client.is_connected():
             try:
@@ -198,6 +198,49 @@ class TelethonManager:
         future = asyncio.run_coroutine_threadsafe(_dialogs(), self.loop)
         return future.result(timeout=20)
 
+    def get_recent_messages(self, chat_id: Any, limit: int = 40) -> List[Dict[str, Any]]:
+        async def _fetch():
+            try:
+                await self._ensure_client()
+                tz_th = timezone(timedelta(hours=7))
+                entity = await self.client.get_entity(chat_id)
+                msgs = await self.client.get_messages(entity, limit=limit)
+                out = []
+                for m in msgs:
+                    dt_th = m.date.astimezone(tz_th)
+                    s = await m.get_sender()
+                    sname = getattr(s, "first_name", "") or getattr(s, "title", "")
+                    out.append({
+                        "id": m.id,
+                        "date": dt_th.strftime("%Y-%m-%d %H:%M:%S"),
+                        "sender": sname,
+                        "text": m.text or m.message or ""
+                    })
+                return out
+            except Exception as e:
+                print(f"Error fetching messages from {chat_id}: {e}")
+                return []
+
+        future = asyncio.run_coroutine_threadsafe(_fetch(), self.loop)
+        return future.result(timeout=25)
+
+    def download_media_msg(self, chat_id: Any, msg_id: int, out_path: str) -> Optional[str]:
+        async def _download():
+            try:
+                await self._ensure_client()
+                entity = await self.client.get_entity(chat_id)
+                msg = await self.client.get_messages(entity, ids=msg_id)
+                if msg and msg.media:
+                    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+                    p = await msg.download_media(out_path)
+                    return p
+                return None
+            except Exception as e:
+                print(f"Error downloading media {msg_id}: {e}")
+                return None
+        future = asyncio.run_coroutine_threadsafe(_download(), self.loop)
+        return future.result(timeout=30)
+
     def sync_group_history(self, chat_id: Any, channel: str, since_date: str = "2026-08-01") -> Dict[str, Any]:
         """
         Pull all past chat messages from chat_id since since_date,
@@ -326,7 +369,9 @@ class TelethonManager:
 
                 # Detect channel
                 channel = "online"
-                if "ขอนแก่น" in chat_title or "kkc" in chat_title.lower():
+                if "โคราช" in chat_title or "korat" in chat_title.lower() or getattr(chat, "id", 0) in (-5260539289, 5260539289):
+                    channel = "korat"
+                elif "ขอนแก่น" in chat_title or "kkc" in chat_title.lower() or getattr(chat, "id", 0) in (-5366638194, 5366638194):
                     channel = "kkc"
 
                 sender = await event.get_sender()
@@ -396,7 +441,7 @@ class TelethonManager:
             start_utc = datetime.now(tz_th).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
             sku_cost_map = get_sku_cost_map()
             
-            for ch_id, ch_name in [(-4242902075, "online"), (-5366638194, "kkc")]:
+            for ch_id, ch_name in [(-4242902075, "online"), (-5366638194, "kkc"), (-5260539289, "korat")]:
                 try:
                     entity = await self.client.get_entity(ch_id)
                     live_msg_ids = set()
@@ -416,10 +461,8 @@ class TelethonManager:
                                 message_id=str(msg.id)
                             )
                             if p:
-                                p["order_date"] = d_str
                                 p["order_time"] = time_str
-                                if d_str == datetime.now(tz_th).strftime("%Y-%m-%d"):
-                                    live_msg_ids.add(str(msg.id))
+                                live_msg_ids.add(str(msg.id))
                                 save_order_to_db(p)
                                 
                     # Clean up deleted messages for today
