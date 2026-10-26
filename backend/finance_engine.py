@@ -50,7 +50,12 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     kkc_labor_weekday = float(settings.get("KKC_LABOR_WEEKDAY", "460.0"))
     kkc_labor_weekend = float(settings.get("KKC_LABOR_WEEKEND", "500.0"))
     kkc_misc_rate = float(settings.get("KKC_MISC_PER_ORDER", "6.0"))
+
+    korat_labor_daily = float(settings.get("KORAT_LABOR_DAILY", "460.0"))
+    korat_labor_weekday = float(settings.get("KORAT_LABOR_WEEKDAY", str(korat_labor_daily)))
+    korat_labor_weekend = float(settings.get("KORAT_LABOR_WEEKEND", str(korat_labor_daily)))
     korat_misc_rate = float(settings.get("KORAT_MISC_PER_ORDER", "6.0"))
+    korat_opening_date = settings.get("KORAT_OPENING_DATE", "2026-10-23")
 
     # Fetch FB Ads in range
     cur.execute("""
@@ -124,9 +129,18 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
 
     korat_rent = sum(get_korat_daily_rent(d) for d in dates_list)
     korat_rent_desc = f"{get_korat_daily_rent(dates_list[0]):,.2f} บ./วัน" if days_count == 1 else f"สัญญา 32,100 บ./เดือน ({korat_rent:,.2f} บ.)"
+    
+    # Calculate Korat labor (for active dates from opening)
+    active_korat_dates = [d for d in dates_list if d.strftime("%Y-%m-%d") >= korat_opening_date]
+    korat_labor = sum(korat_labor_weekend if d.weekday() in [4, 5, 6] else korat_labor_weekday for d in active_korat_dates)
+    if korat_labor_weekday == korat_labor_weekend:
+        korat_labor_desc = f"{korat_labor_weekday:,.0f} บ./วัน"
+    else:
+        korat_labor_desc = f"จ-พฤ {korat_labor_weekday:,.0f} / ศ-อา {korat_labor_weekend:,.0f} บ."
+
     korat_misc = korat_orders_count * korat_misc_rate
     korat_ads = fb_korat_spend
-    korat_expenses = korat_rent + korat_misc + korat_ads
+    korat_expenses = korat_rent + korat_labor + korat_misc + korat_ads
     korat_net_profit = korat_gross_profit - korat_expenses
     korat_net_margin = (korat_net_profit / korat_gross_sales * 100) if korat_gross_sales > 0 else 0.0
 
@@ -215,6 +229,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": "3. กำไรขั้นต้นหน้าร้าน โคราช (Gross Profit)", "amount": korat_gross_profit, "pct": korat_gross_margin, "type": "gross_profit", "bold": True},
             {"label": "4. ค่าใช้จ่ายหน้าร้าน โคราช (Store Expenses):", "amount": korat_expenses, "pct": pct(korat_expenses, target_sales), "type": "header", "bold": True},
             {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล โคราช ({korat_rent_desc})", "amount": korat_rent, "pct": pct(korat_rent, target_sales), "type": "expense"},
+            {"label": f"   - ค่าพนักงานหน้าร้าน เซนทรัล โคราช ({korat_labor_desc})", "amount": korat_labor, "pct": pct(korat_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads (เฉพาะแคมเปญโคราช)", "amount": korat_ads, "pct": pct(korat_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงใส่สินค้า (6 บ./ออเดอร์)", "amount": korat_misc, "pct": pct(korat_misc, target_sales), "type": "expense"},
             {"label": "5. กำไรสุทธิหน้าร้าน เซนทรัล โคราช (Net Profit)", "amount": korat_net_profit, "pct": korat_net_margin, "type": "net_profit", "bold": True}
@@ -256,6 +271,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน KKC (6 บ./ออเดอร์)", "amount": kkc_misc, "pct": pct(kkc_misc, target_sales), "type": "expense"},
             {"label": "6. ค่าใช้จ่ายหน้าร้านเซนทรัล โคราช (Korat Expenses):", "amount": korat_expenses, "pct": pct(korat_expenses, target_sales), "type": "header", "bold": True},
             {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล โคราช ({korat_rent_desc})", "amount": korat_rent, "pct": pct(korat_rent, target_sales), "type": "expense"},
+            {"label": f"   - ค่าคนหน้าร้านเซนทรัล โคราช ({korat_labor_desc})", "amount": korat_labor, "pct": pct(korat_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads หน้าร้าน โคราช", "amount": korat_ads, "pct": pct(korat_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน โคราช (6 บ./ออเดอร์)", "amount": korat_misc, "pct": pct(korat_misc, target_sales), "type": "expense"},
             {"label": "7. กำไรสุทธิรวมทั้งบริษัท (Consolidated Net Profit)", "amount": cons_net_profit, "pct": cons_net_margin, "type": "net_profit", "bold": True}
@@ -377,7 +393,10 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             kkc_ads_val
         )
 
+        d_korat_labor = (korat_labor_weekend if d.weekday() in [4, 5, 6] else korat_labor_weekday) if d_str >= korat_opening_date else 0.0
         d_korat_exp = (
+            get_korat_daily_rent(d) +
+            d_korat_labor +
             (len(d_korat_orders) * korat_misc_rate) +
             korat_ads_val
         )
