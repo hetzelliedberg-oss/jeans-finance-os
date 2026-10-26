@@ -47,16 +47,17 @@ class TelegramBotWorker:
                 kkc_chat_id = settings.get("TELEGRAM_KKC_CHAT_ID", "").strip()
 
                 url = f"https://api.telegram.org/bot{token}/getUpdates"
-                params = {"offset": self.last_update_id + 1, "timeout": 15}
+                params = {"offset": self.last_update_id + 1, "timeout": 5}
 
-                res = requests.get(url, params=params, timeout=20)
+                res = requests.get(url, params=params, timeout=10)
                 import json as _json
                 data = _json.loads(res.content.decode('utf-8'))
 
                 if not data.get("ok"):
-                    time.sleep(5)
+                    time.sleep(3)
                     continue
 
+                results = data.get("result", [])
                 sku_cost_map = get_sku_cost_map()
 
                 for update in data.get("result", []):
@@ -80,13 +81,19 @@ class TelegramBotWorker:
                     order_date = dt.strftime("%Y-%m-%d")
                     order_time = dt.strftime("%Y-%m-%d %H:%M:%S")
 
+                    korat_chat_id = settings.get("TELEGRAM_KORAT_CHAT_ID", "").strip()
+
                     # Identify channel & auto-register chat ID if matched
                     channel = "online"
+                    is_korat_group = (
+                        (korat_chat_id and chat_id == korat_chat_id) or
+                        "โคราช" in chat_title or
+                        "korat" in chat_title.lower()
+                    )
                     is_kkc_group = (
                         (kkc_chat_id and chat_id == kkc_chat_id) or
                         "ขอนแก่น" in chat_title or
-                        "kkc" in chat_title.lower() or
-                        "หน้าร้าน" in chat_title
+                        "kkc" in chat_title.lower()
                     )
                     is_online_group = (
                         (online_chat_id and chat_id == online_chat_id) or
@@ -97,7 +104,14 @@ class TelegramBotWorker:
                         "office" in chat_title.lower()
                     )
 
-                    if is_kkc_group:
+                    if is_korat_group:
+                        channel = "korat"
+                        if not korat_chat_id or korat_chat_id != chat_id:
+                            from backend.database import update_setting
+                            update_setting("TELEGRAM_KORAT_CHAT_ID", chat_id)
+                            korat_chat_id = chat_id
+                            print(f"[Telegram Bot] Auto-registered KORAT chat_id={chat_id} ('{chat_title}')", flush=True)
+                    elif is_kkc_group:
                         channel = "kkc"
                         if not kkc_chat_id or kkc_chat_id != chat_id:
                             from backend.database import update_setting
@@ -159,9 +173,11 @@ class TelegramBotWorker:
 
             except Exception as ex:
                 print(f"[Telegram Bot] Error in poll loop: {ex}", flush=True)
-                time.sleep(5)
+                time.sleep(2)
 
-            time.sleep(1)
+            # Ultra-fast loop: only brief yield if no updates to keep CPU low
+            if not data.get("result"):
+                time.sleep(0.2)
 
 
 telegram_bot_instance = TelegramBotWorker()
