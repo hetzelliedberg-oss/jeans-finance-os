@@ -230,7 +230,11 @@ def init_db():
         "KKC_MISC_PER_ORDER": "6.0",         # 6 THB / order bag
 
         "KORAT_RENT_MONTHLY": "32100.0",     # Contract 32,100 THB / month (Oct 31 days -> 1,035.48 THB / day)
+        "KORAT_LABOR_DAILY": "460.0",        # 460 THB / day
+        "KORAT_LABOR_WEEKDAY": "460.0",      # Mon-Thu 460 THB / day
+        "KORAT_LABOR_WEEKEND": "460.0",      # Fri-Sun 460 THB / day
         "KORAT_MISC_PER_ORDER": "6.0",       # 6 THB / order bag
+        "KORAT_OPENING_DATE": "2026-10-23",  # Grand Opening Date
 
         "AD_ACCOUNT_ID": "act_703804833399837",
         "FB_ACCESS_TOKEN": "EAAGpwBXjbGABQ9OBEe5Ha0gjNLm5r5WQGteb8NBu0owaebyLZBcKpfXZC261ZBxFZABQhsjoqnFoIvMwo2zNCMhxYfUCQixZBDrzYWNDXrJ0K6FtqUxN91qGpb8GTfQKIZAfPRosahjtQbraH0zNO5EqjnjTyTna84kyGk2I7yDZAOQN7KtWEEcZCMljB0KXlr9JvF8oRZAAaSpsfVDZBVZCC4x",
