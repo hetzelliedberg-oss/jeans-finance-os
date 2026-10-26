@@ -1202,7 +1202,7 @@ xrp55 2 ตัว
     function initTodayDates() {
       let today = new Date();
       if (today.getFullYear() < 2026) {
-        today = new Date(2026, 9, 25);
+        today = new Date(2026, 9, 26);
       }
       const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const todayStr = fmt(today);
