@@ -706,6 +706,44 @@
           </div>
         </div>
 
+        <!-- Storefront Korat Settings -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+          <h3 class="text-sm font-semibold text-rose-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+            <i data-lucide="store" class="w-4 h-4"></i>
+            <span>อัตราค่าใช้จ่าย: หน้าร้านเซนทรัล โคราช (Korat)</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าเช่าพื้นที่สัญญา (บาท/เดือน):</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKoratRentMonthly" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="32100">
+                <span class="text-xs text-slate-400">บ./เดือน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าคน จันทร์ - พฤหัสบดี:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKoratLaborWeekday" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="460">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าคน ศุกร์ - อาทิตย์:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKoratLaborWeekend" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="460">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าจิปาถะ/ถุงใส่สินค้าต่อออเดอร์:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingKoratMisc" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="6">
+                <span class="text-xs text-slate-400">บ./ออเดอร์</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Connection Settings -->
         <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
           <h3 class="text-sm font-semibold text-indigo-400 flex items-center gap-2 border-b border-slate-800 pb-2">
@@ -2457,6 +2495,11 @@ xrp55 2 ตัว
         document.getElementById("settingKkcLaborWeekend").value = s.KKC_LABOR_WEEKEND || "500";
         document.getElementById("settingKkcMisc").value = s.KKC_MISC_PER_ORDER || "6";
 
+        document.getElementById("settingKoratRentMonthly").value = s.KORAT_RENT_MONTHLY || "32100";
+        document.getElementById("settingKoratLaborWeekday").value = s.KORAT_LABOR_WEEKDAY || s.KORAT_LABOR_DAILY || "460";
+        document.getElementById("settingKoratLaborWeekend").value = s.KORAT_LABOR_WEEKEND || s.KORAT_LABOR_DAILY || "460";
+        document.getElementById("settingKoratMisc").value = s.KORAT_MISC_PER_ORDER || "6";
+
         document.getElementById("settingFbAdAccount").value = s.AD_ACCOUNT_ID || "act_703804833399837";
         document.getElementById("settingTelegramToken").value = s.TELEGRAM_BOT_TOKEN || "";
         const mToken = document.getElementById("modalTgBotToken");
@@ -2479,6 +2522,12 @@ xrp55 2 ตัว
         KKC_LABOR_WEEKDAY: document.getElementById("settingKkcLaborWeekday").value,
         KKC_LABOR_WEEKEND: document.getElementById("settingKkcLaborWeekend").value,
         KKC_MISC_PER_ORDER: document.getElementById("settingKkcMisc").value,
+
+        KORAT_RENT_MONTHLY: document.getElementById("settingKoratRentMonthly").value,
+        KORAT_LABOR_WEEKDAY: document.getElementById("settingKoratLaborWeekday").value,
+        KORAT_LABOR_WEEKEND: document.getElementById("settingKoratLaborWeekend").value,
+        KORAT_LABOR_DAILY: document.getElementById("settingKoratLaborWeekday").value,
+        KORAT_MISC_PER_ORDER: document.getElementById("settingKoratMisc").value,
 
         AD_ACCOUNT_ID: document.getElementById("settingFbAdAccount").value,
         TELEGRAM_BOT_TOKEN: document.getElementById("settingTelegramToken").value,
