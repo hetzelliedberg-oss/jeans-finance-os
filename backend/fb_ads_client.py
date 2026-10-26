@@ -154,21 +154,32 @@ class AdsSyncWorker:
         self.is_running = False
 
     def _run_loop(self):
+        from datetime import timezone
+        tz_th = timezone(timedelta(hours=7))
+        iteration = 0
         while self.is_running:
             try:
-                from datetime import timezone
-                tz_th = timezone(timedelta(hours=7))
                 today = datetime.now(tz_th)
-                since = (today - timedelta(days=14)).strftime("%Y-%m-%d")
-                until = today.strftime("%Y-%m-%d")
-                res = fetch_and_sync_fb_ads(since, until)
-                if res.get("success"):
-                    print(f"[FB Ads Sync] Auto-synced {res.get('synced_days')} days of ads up to {until}", flush=True)
+                today_str = today.strftime("%Y-%m-%d")
+
+                # ⚡ Ultra-fast real-time sync for TODAY's spend (runs every 60s)
+                res_today = fetch_and_sync_fb_ads(today_str, today_str)
+                if res_today.get("success"):
+                    print(f"[FB Ads Sync] ⚡ Fast-synced today's spend ({today_str})", flush=True)
+
+                # Every 15 minutes (15 iterations of 60s): sync past 14 days
+                if iteration % 15 == 0:
+                    since = (today - timedelta(days=14)).strftime("%Y-%m-%d")
+                    res_hist = fetch_and_sync_fb_ads(since, today_str)
+                    if res_hist.get("success"):
+                        print(f"[FB Ads Sync] 📜 Synced 14-day historical ads ({since} to {today_str})", flush=True)
+
+                iteration += 1
             except Exception as e:
                 print(f"[FB Ads Sync] Error in auto sync: {e}", flush=True)
             
-            # Sleep 5 minutes (300 seconds) for real-time spend updates
-            for _ in range(300):
+            # Sleep 60 seconds for near instant real-time ads spend updates
+            for _ in range(60):
                 if not self.is_running:
                     break
                 time.sleep(1)
