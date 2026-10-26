@@ -156,7 +156,9 @@ class AdsSyncWorker:
     def _run_loop(self):
         while self.is_running:
             try:
-                today = datetime.now()
+                from datetime import timezone
+                tz_th = timezone(timedelta(hours=7))
+                today = datetime.now(tz_th)
                 since = (today - timedelta(days=14)).strftime("%Y-%m-%d")
                 until = today.strftime("%Y-%m-%d")
                 res = fetch_and_sync_fb_ads(since, until)
@@ -165,8 +167,8 @@ class AdsSyncWorker:
             except Exception as e:
                 print(f"[FB Ads Sync] Error in auto sync: {e}", flush=True)
             
-            # Sleep 15 minutes (900 seconds)
-            for _ in range(900):
+            # Sleep 5 minutes (300 seconds) for real-time spend updates
+            for _ in range(300):
                 if not self.is_running:
                     break
                 time.sleep(1)
