@@ -1189,14 +1189,26 @@ xrp55 2 ตัว
     let currentTab = 'pnl';
     let trendChartInstance = null;
     let cachedSkuCosts = [];
+    window.pnlCache = {};
 
-    // Initialize Lucide icons
+    // Initialize Lucide icons & start real-time live sync
     document.addEventListener("DOMContentLoaded", () => {
       lucide.createIcons();
       initTodayDates();
       loadCurrentReport();
       loadSettings();
       checkTelegramStatus();
+
+      // Real-time Live Polling Loop (every 3 seconds like local PC)
+      setInterval(() => {
+        if (!document.hidden) {
+          loadCurrentReport(true);
+          if (currentTab === 'orders') {
+            const q = document.getElementById("orderSearchInput") ? document.getElementById("orderSearchInput").value.trim() : "";
+            if (!q) loadOrdersTab();
+          }
+        }
+      }, 3000);
     });
 
     function initTodayDates() {
@@ -1296,6 +1308,18 @@ xrp55 2 ตัว
           }
         }
       });
+
+      // Instant 0ms render from cache if available (eliminates lag like local PC)
+      const start = document.getElementById("inputStartDate").value;
+      const end = document.getElementById("inputEndDate").value;
+      const cacheKey = `${start}_${end}_${currentChannel}`;
+      if (window.pnlCache && window.pnlCache[cacheKey]) {
+        window.lastReportData = window.pnlCache[cacheKey];
+        renderPnlData(window.pnlCache[cacheKey]);
+        if (currentTab === 'admins') renderAdminsTab();
+        else if (currentTab === 'skus') renderSkusTab();
+      }
+
       loadCurrentReport();
       if (currentTab === 'orders') loadOrdersTab();
     }
@@ -1315,24 +1339,39 @@ xrp55 2 ตัว
         c.className = "day-chip px-2 py-0.5 rounded text-slate-300 bg-slate-950 hover:bg-slate-800 border border-slate-800 transition";
       });
 
-      let startStr = "2026-10-25";
-      let endStr = "2026-10-25";
+      let today = new Date();
+      if (today.getFullYear() < 2026) {
+        today = new Date(2026, 9, 26);
+      }
+      const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const todayStr = fmt(today);
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
+      const yesterdayStr = fmt(yesterday);
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 6);
+      const sevenDaysStr = fmt(sevenDaysAgo);
+      const monthStart = fmt(new Date(today.getFullYear(), today.getMonth(), 1));
+      const monthEnd = fmt(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+
+      let startStr = todayStr;
+      let endStr = todayStr;
 
       if (preset === 'today') {
-        startStr = "2026-10-25";
-        endStr = "2026-10-25";
+        startStr = todayStr;
+        endStr = todayStr;
       } else if (preset === 'yesterday') {
-        startStr = "2026-10-24";
-        endStr = "2026-10-24";
+        startStr = yesterdayStr;
+        endStr = yesterdayStr;
       } else if (preset === '23oct') {
         startStr = "2026-10-23";
         endStr = "2026-10-23";
       } else if (preset === 'oct') {
-        startStr = "2026-10-01";
-        endStr = "2026-10-31";
+        startStr = monthStart;
+        endStr = monthEnd;
       } else if (preset === '7d') {
-        startStr = "2026-10-19";
-        endStr = "2026-10-25";
+        startStr = sevenDaysStr;
+        endStr = todayStr;
       } else if (preset === 'sep') {
         startStr = "2026-09-01";
         endStr = "2026-09-30";
@@ -1350,6 +1389,14 @@ xrp55 2 ตัว
       }
 
       updateActivePeriodBadge();
+
+      // Instant 0ms render from cache
+      const cacheKey = `${startStr}_${endStr}_${currentChannel}`;
+      if (window.pnlCache && window.pnlCache[cacheKey]) {
+        window.lastReportData = window.pnlCache[cacheKey];
+        renderPnlData(window.pnlCache[cacheKey]);
+      }
+
       loadCurrentReport();
       if (currentTab === 'orders') loadOrdersTab();
     }
@@ -1369,6 +1416,14 @@ xrp55 2 ตัว
       document.getElementById("inputStartDate").value = dateStr;
       document.getElementById("inputEndDate").value = dateStr;
       updateActivePeriodBadge();
+
+      // Instant 0ms cache render
+      const cacheKey = `${dateStr}_${dateStr}_${currentChannel}`;
+      if (window.pnlCache && window.pnlCache[cacheKey]) {
+        window.lastReportData = window.pnlCache[cacheKey];
+        renderPnlData(window.pnlCache[cacheKey]);
+      }
+
       loadCurrentReport();
       if (currentTab === 'orders') loadOrdersTab();
     }
@@ -1398,17 +1453,27 @@ xrp55 2 ตัว
       }
     }
 
-    async function loadCurrentReport() {
+    async function loadCurrentReport(isSilent = false) {
       const start = document.getElementById("inputStartDate").value;
       const end = document.getElementById("inputEndDate").value;
       updateActivePeriodBadge();
 
       const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : 'งบรวมทั้งบริษัท'));
-      document.getElementById("pnlPeriodSubtitle").innerText = `ช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel}`;
+      const subtitleEl = document.getElementById("pnlPeriodSubtitle");
+      if (subtitleEl) {
+        subtitleEl.innerText = `ช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel}`;
+      }
+
+      const cacheKey = `${start}_${end}_${currentChannel}`;
+      if (!isSilent && window.pnlCache && window.pnlCache[cacheKey]) {
+        renderPnlData(window.pnlCache[cacheKey]);
+      }
 
       try {
         const res = await fetch(`/api/pnl?start_date=${start}&end_date=${end}&channel=${currentChannel}`);
         const data = await res.json();
+        window.pnlCache = window.pnlCache || {};
+        window.pnlCache[cacheKey] = data;
         window.lastReportData = data;
         renderPnlData(data);
         if (currentTab === 'admins') renderAdminsTab();
