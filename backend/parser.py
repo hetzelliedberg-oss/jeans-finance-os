@@ -5,11 +5,24 @@ from typing import Dict, List, Any, Optional
 
 def extract_business_date(dt_th: datetime, text: str) -> str:
     """
-    Handle late-night orders posted past midnight (00:00 - 05:59)
-    that belong to yesterday's batch (e.g. sequence number > 10 like order #39 continuing #38).
+    Handle:
+    1. Explicit date written in text/first line (e.g. '23/10', '23/10/26', '23-10')
+       used when admins post late orders from the previous day.
+    2. Late-night orders posted past midnight (00:00 - 05:59)
+       that belong to yesterday's batch (e.g. sequence number > 10 like order #39 continuing #38).
     """
     lines = [l.strip() for l in (text or "").strip().split('\n') if l.strip()]
     first_line = lines[0] if lines else ""
+    
+    # Check explicit date in first 2 lines
+    for line in lines[:2]:
+        m_date = re.search(r'\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b', line)
+        if m_date:
+            d, m = int(m_date.group(1)), int(m_date.group(2))
+            if 1 <= d <= 31 and 1 <= m <= 12:
+                year = dt_th.year
+                return f"{year:04d}-{m:02d}-{d:02d}"
+
     m_seq = re.match(r'^(\d+)', first_line)
     if dt_th.hour < 6 and m_seq and int(m_seq.group(1)) > 10:
         return (dt_th - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -54,6 +67,7 @@ def extract_admin_name(text: str, default_sender: str = "") -> str:
 
 def extract_payment_and_amount(text: str) -> Dict[str, Any]:
     """Determine payment method and total amount paid/cod accurately"""
+    text = (text or "").replace("‚", ",").replace("，", ",").replace("、", ",")
     cod_amount = 0.0
     transfer_amount = 0.0
     cash_amount = 0.0
@@ -329,7 +343,7 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
     โอน : 0
     เงินสด : 1100
     """
-    t = text.strip()
+    t = text.strip().replace("‚", ",").replace("，", ",").replace("、", ",")
     # Reject if it looks like an online order
     if any(k in t for k in ["สรุปออเดอร์", "ปลายทาง", "facebook", "admin :", "เพจ :", "ที่อยู่ :", "รหัส :1", "รหัส :2", "รหัส :3", "รหัส :4", "รหัส :5", "รหัส :6", "รหัส :7", "รหัส :8", "รหัส :9"]):
         return None
@@ -461,12 +475,14 @@ def parse_order_message(
     if not text or not text.strip():
         return None
 
-    # Ignore operational notices like size exchanges or stock adjustments
-    if any(k in text for k in ["เปลี่ยนไซต์", "เปลี่ยนไซส์", "แก้สต๊อก", "แก้ไขในสต๊อก", "แก้ไขสต็อก", "แจ้งเปลี่ยน"]):
+    text = text.replace("‚", ",").replace("，", ",").replace("、", ",")
+
+    # Ignore operational notices like size exchanges, stock adjustments, or sample templates
+    if any(k in text for k in ["ตัวอย่าง", "เปลี่ยนไซต์", "เปลี่ยนไซส์", "แก้สต๊อก", "แก้ไขในสต๊อก", "แก้ไขสต็อก", "แจ้งเปลี่ยน"]):
         return None
 
-    # 1. Check if structured staff storefront order format (only for storefront kkc or storefront text)
-    if source_channel == "kkc" or ("ลูกค้า" in text and ("รหัสสินค้า" in text or "หน้าร้าน" in text)):
+    # 1. Check if structured staff storefront order format (for KKC, Korat, or storefront text)
+    if source_channel in ["kkc", "korat"] or ("ลูกค้า" in text and ("รหัสสินค้า" in text or "หน้าร้าน" in text)):
         structured = parse_structured_storefront_order(text, sku_cost_map, order_date)
         if structured:
             structured["message_id"] = message_id
@@ -544,11 +560,32 @@ def parse_order_message(
     # Commission: 10 THB / piece for online admin
     commission = total_pieces * 10.0 if source_channel == "online" else 0.0
 
+    # Check if text explicitly specifies a date (e.g. "1 ลูกค้าเก่า** 23/10" or "วันที่ 23/10/69")
+    final_date = order_date
+    m_exp_date = re.search(r'(?:วันที่\s*[:=]?\s*|\b)(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2,4}))?\b', text[:100])
+    if m_exp_date:
+        d_val = int(m_exp_date.group(1))
+        m_val = int(m_exp_date.group(2))
+        y_val = int(m_exp_date.group(3)) if m_exp_date.group(3) else 2026
+        if y_val == 69:
+            y_val = 2026
+        elif y_val < 100:
+            y_val = 2000 + y_val
+        if 1 <= d_val <= 31 and 1 <= m_val <= 12:
+            cand_date = f"{y_val:04d}-{m_val:02d}-{d_val:02d}"
+            try:
+                dt_cand = datetime.strptime(cand_date, "%Y-%m-%d")
+                dt_post = datetime.strptime(order_date, "%Y-%m-%d") if order_date else dt_cand
+                if abs((dt_post - dt_cand).days) <= 7:
+                    final_date = cand_date
+            except Exception:
+                pass
+
     return {
         "source_channel": source_channel,
         "message_id": message_id,
         "sender_name": admin_name,
-        "order_date": order_date,
+        "order_date": final_date,
         "order_time": order_time,
         "raw_text": text.strip(),
         "total_pieces": total_pieces,
