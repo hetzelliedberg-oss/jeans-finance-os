@@ -188,7 +188,9 @@ class TelethonManager:
                             "id": d.id,
                             "title": d.title,
                             "is_online_group": "ออนไลน์" in d.title or "office" in d.title.lower(),
-                            "is_kkc_group": "ขอนแก่น" in d.title or "kkc" in d.title.lower()
+                            "is_kkc_group": "ขอนแก่น" in d.title or "kkc" in d.title.lower(),
+                            "is_korat_group": "โคราช" in d.title or "korat" in d.title.lower(),
+                            "is_udn_group": "อุดร" in d.title or "udn" in d.title.lower()
                         })
                 return results
             except Exception as e:
@@ -369,7 +371,9 @@ class TelethonManager:
 
                 # Detect channel
                 channel = "online"
-                if "โคราช" in chat_title or "korat" in chat_title.lower() or getattr(chat, "id", 0) in (-5260539289, 5260539289):
+                if "อุดร" in chat_title or "udn" in chat_title.lower() or getattr(chat, "id", 0) in (-5325611582, 5325611582):
+                    channel = "udn"
+                elif "โคราช" in chat_title or "korat" in chat_title.lower() or getattr(chat, "id", 0) in (-5260539289, 5260539289):
                     channel = "korat"
                 elif "ขอนแก่น" in chat_title or "kkc" in chat_title.lower() or getattr(chat, "id", 0) in (-5366638194, 5366638194):
                     channel = "kkc"
@@ -441,7 +445,7 @@ class TelethonManager:
             start_utc = datetime.now(tz_th).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
             sku_cost_map = get_sku_cost_map()
             
-            for ch_id, ch_name in [(-4242902075, "online"), (-5366638194, "kkc"), (-5260539289, "korat")]:
+            for ch_id, ch_name in [(-4242902075, "online"), (-5366638194, "kkc"), (-5260539289, "korat"), (-5325611582, "udn")]:
                 try:
                     entity = await self.client.get_entity(ch_id)
                     live_msg_ids = set()
