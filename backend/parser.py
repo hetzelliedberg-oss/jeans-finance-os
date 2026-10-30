@@ -481,8 +481,8 @@ def parse_order_message(
     if any(k in text for k in ["ตัวอย่าง", "เปลี่ยนไซต์", "เปลี่ยนไซส์", "แก้สต๊อก", "แก้ไขในสต๊อก", "แก้ไขสต็อก", "แจ้งเปลี่ยน"]):
         return None
 
-    # 1. Check if structured staff storefront order format (for KKC, Korat, or storefront text)
-    if source_channel in ["kkc", "korat"] or ("ลูกค้า" in text and ("รหัสสินค้า" in text or "หน้าร้าน" in text)):
+    # 1. Check if structured staff storefront order format (for KKC, Korat, UDN, or storefront text)
+    if source_channel in ["kkc", "korat", "udn"] or ("ลูกค้า" in text and ("รหัสสินค้า" in text or "หน้าร้าน" in text)):
         structured = parse_structured_storefront_order(text, sku_cost_map, order_date)
         if structured:
             structured["message_id"] = message_id
