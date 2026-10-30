@@ -166,7 +166,8 @@ class StorefrontDailyEntry(BaseModel):
     sales: float
     pieces: int
     orders_count: Optional[int] = 0
-    note: Optional[str] = "ยอดขายประจำวันสาขาเซนทรัล KKC"
+    note: Optional[str] = "ยอดขายประจำวัน"
+    channel: Optional[str] = "kkc"
 
 
 class TelegramPhoneRequest(BaseModel):
@@ -256,6 +257,8 @@ def get_orders_list(
             conditions.append("source_channel IN ('kkc', 'storefront_kkc')")
         elif channel in ["korat", "storefront_korat"]:
             conditions.append("source_channel IN ('korat', 'storefront_korat')")
+        elif channel in ["udn", "storefront_udn", "udon"]:
+            conditions.append("source_channel IN ('udn', 'storefront_udn', 'udon')")
         else:
             conditions.append("source_channel = ?")
             params.append(channel)
@@ -342,10 +345,15 @@ def delete_order_by_id(order_id: int):
 
 @app.post("/api/storefront/daily-entry")
 def record_storefront_daily_entry(req: StorefrontDailyEntry):
-    """Record daily sales and pieces for Central Khon Kaen Storefront"""
+    """Record daily sales and pieces for Storefront (KKC, Korat, UDN)"""
     conn = get_db_connection()
     cur = conn.cursor()
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    ch = "korat" if req.channel in ["korat", "storefront_korat"] else ("udn" if req.channel in ["udn", "storefront_udn", "udon"] else "kkc")
+    store_name = "หน้าร้านเซนทรัล โคราช" if ch == "korat" else ("หน้าร้านเซนทรัล อุดรธานี" if ch == "udn" else "หน้าร้านเซนทรัล KKC")
+    sku_name = f"{ch.upper()}_STORE"
+    msg_id = f"{ch}_daily_{req.date}"
 
     # Average jean cost estimate if not itemized
     sku_cost_map = get_sku_cost_map()
@@ -353,10 +361,8 @@ def record_storefront_daily_entry(req: StorefrontDailyEntry):
     total_cogs = round(req.pieces * avg_cost, 2)
     orders_cnt = req.orders_count if req.orders_count > 0 else max(req.pieces, 1)
 
-    msg_id = f"kkc_daily_{req.date}"
-
     # Check existing entry for this day
-    cur.execute("SELECT id FROM orders WHERE source_channel = 'kkc' AND message_id = ?", (msg_id,))
+    cur.execute("SELECT id FROM orders WHERE source_channel = ? AND message_id = ?", (ch, msg_id))
     existing = cur.fetchone()
 
     if existing:
@@ -364,9 +370,9 @@ def record_storefront_daily_entry(req: StorefrontDailyEntry):
         cur.execute("""
             UPDATE orders SET
                 total_pieces = ?, total_sales = ?, transfer_amount = ?,
-                cogs_total = ?, raw_text = ?, sender_name = 'หน้าร้านเซนทรัล KKC'
+                cogs_total = ?, raw_text = ?, sender_name = ?
             WHERE id = ?
-        """, (req.pieces, req.sales, req.sales, total_cogs, req.note, oid))
+        """, (req.pieces, req.sales, req.sales, total_cogs, req.note, store_name, oid))
         cur.execute("DELETE FROM order_items WHERE order_id = ?", (oid,))
     else:
         cur.execute("""
@@ -376,23 +382,23 @@ def record_storefront_daily_entry(req: StorefrontDailyEntry):
                 transfer_amount, cogs_total, commission_amount, status, created_at,
                 customer_name, platform
             ) VALUES (
-                'kkc', ?, 'หน้าร้านเซนทรัล KKC', ?, ?,
+                ?, ?, ?, ?, ?,
                 ?, ?, ?, 'โอน', 0.0,
                 ?, ?, 0.0, 'completed', ?,
                 'ลูกค้าหน้าร้าน', 'storefront'
             )
-        """, (msg_id, req.date, f"{req.date} 21:00:00", req.note, req.pieces, req.sales, req.sales, total_cogs, now_str))
+        """, (ch, msg_id, store_name, req.date, f"{req.date} 21:00:00", req.note, req.pieces, req.sales, req.sales, total_cogs, now_str))
         oid = cur.lastrowid
 
     # Insert default item
     cur.execute("""
         INSERT INTO order_items (order_id, sku, size, color, quantity, unit_cost, total_cost)
-        VALUES (?, 'KKC_STORE', 'ALL', '', ?, ?, ?)
-    """, (oid, req.pieces, avg_cost, total_cogs))
+        VALUES (?, ?, 'ALL', '', ?, ?, ?)
+    """, (oid, sku_name, req.pieces, avg_cost, total_cogs))
 
     conn.commit()
     conn.close()
-    return {"success": True, "date": req.date, "sales": req.sales, "pieces": req.pieces, "cogs": total_cogs}
+    return {"success": True, "channel": ch, "date": req.date, "sales": req.sales, "pieces": req.pieces, "cogs": total_cogs}
 
 
 @app.post("/api/orders/scan-text")
@@ -464,6 +470,8 @@ def telegram_sync_group(req: TelegramSyncRequest):
         ch = "kkc"
     elif req.channel in ["korat", "storefront_korat"]:
         ch = "korat"
+    elif req.channel in ["udn", "storefront_udn", "udon"]:
+        ch = "udn"
     else:
         ch = "online"
     res = telethon_manager.sync_group_history(req.chat_id, ch, req.since_date or "2026-08-01")
@@ -521,6 +529,8 @@ def onedrive_sync_from_link(req: OneDriveLinkRequest):
                 ch = "storefront_kkc"
             elif req.channel in ["korat", "storefront_korat"]:
                 ch = "storefront_korat"
+            elif req.channel in ["udn", "storefront_udn", "udon"]:
+                ch = "storefront_udn"
             else:
                 ch = "online"
             for c in closings:
@@ -552,6 +562,8 @@ async def onedrive_upload_file(
             ch = "storefront_kkc"
         elif channel in ["korat", "storefront_korat"]:
             ch = "storefront_korat"
+        elif channel in ["udn", "storefront_udn", "udon"]:
+            ch = "storefront_udn"
         else:
             ch = "online"
         for c in closings:
@@ -571,6 +583,8 @@ def onedrive_paste_closing_text(req: PasteClosingRequest):
             ch = "storefront_kkc"
         elif req.channel in ["korat", "storefront_korat"]:
             ch = "storefront_korat"
+        elif req.channel in ["udn", "storefront_udn", "udon"]:
+            ch = "storefront_udn"
         else:
             ch = "online"
         closings = parse_pasted_closing_text(req.text, ch)
