@@ -168,11 +168,13 @@ def init_db():
             updated_at TEXT
         )
     """)
-    # Check if korat_spend column exists for existing DB
+    # Check if korat_spend / udn_spend columns exist for existing DB
     cur.execute("PRAGMA table_info(daily_fb_ads)")
     fb_cols = [c[1] for c in cur.fetchall()]
     if "korat_spend" not in fb_cols:
         cur.execute("ALTER TABLE daily_fb_ads ADD COLUMN korat_spend REAL NOT NULL DEFAULT 0.0")
+    if "udn_spend" not in fb_cols:
+        cur.execute("ALTER TABLE daily_fb_ads ADD COLUMN udn_spend REAL NOT NULL DEFAULT 0.0")
 
 
     # 5. Table: onedrive_closings
@@ -235,6 +237,15 @@ def init_db():
         "KORAT_LABOR_WEEKEND": "460.0",      # Fri-Sun 460 THB / day
         "KORAT_MISC_PER_ORDER": "6.0",       # 6 THB / order bag
         "KORAT_OPENING_DATE": "2026-10-23",  # Grand Opening Date
+
+        "UDN_RENT_MONTHLY": "32100.0",       # Central Udon Thani rent
+        "UDN_LABOR_DAILY": "460.0",          # 460 THB / day
+        "UDN_LABOR_WEEKDAY": "460.0",        # Mon-Thu 460 THB / day
+        "UDN_LABOR_WEEKEND": "460.0",        # Fri-Sun 460 THB / day
+        "UDN_MISC_PER_ORDER": "6.0",         # 6 THB / order bag
+        "UDN_OPENING_DATE": "2026-10-30",    # Grand Opening Date
+        "TELEGRAM_UDN_CHAT_ID": "-5325611582", # Jeans Around UDN
+        "TELEGRAM_UDN_PROFIT_CHAT_ID": "-5401968006", # ยอด-กำไร UDN
 
         "AD_ACCOUNT_ID": "act_703804833399837",
         "FB_ACCESS_TOKEN": "EAAGpwBXjbGABQ9OBEe5Ha0gjNLm5r5WQGteb8NBu0owaebyLZBcKpfXZC261ZBxFZABQhsjoqnFoIvMwo2zNCMhxYfUCQixZBDrzYWNDXrJ0K6FtqUxN91qGpb8GTfQKIZAfPRosahjtQbraH0zNO5EqjnjTyTna84kyGk2I7yDZAOQN7KtWEEcZCMljB0KXlr9JvF8oRZAAaSpsfVDZBVZCC4x",
