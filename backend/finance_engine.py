@@ -47,6 +47,11 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
         korat_rent_monthly = float(settings.get("KORAT_RENT_MONTHLY", "32100.0"))
         return round(korat_rent_monthly / days_in_m, 2)
 
+    def get_udn_daily_rent(dt: datetime) -> float:
+        days_in_m = calendar.monthrange(dt.year, dt.month)[1]
+        udn_rent_monthly = float(settings.get("UDN_RENT_MONTHLY", "32100.0"))
+        return round(udn_rent_monthly / days_in_m, 2)
+
     kkc_labor_weekday = float(settings.get("KKC_LABOR_WEEKDAY", "460.0"))
     kkc_labor_weekend = float(settings.get("KKC_LABOR_WEEKEND", "500.0"))
     kkc_misc_rate = float(settings.get("KKC_MISC_PER_ORDER", "6.0"))
@@ -57,12 +62,19 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     korat_misc_rate = float(settings.get("KORAT_MISC_PER_ORDER", "6.0"))
     korat_opening_date = settings.get("KORAT_OPENING_DATE", "2026-10-23")
 
+    udn_labor_daily = float(settings.get("UDN_LABOR_DAILY", "460.0"))
+    udn_labor_weekday = float(settings.get("UDN_LABOR_WEEKDAY", str(udn_labor_daily)))
+    udn_labor_weekend = float(settings.get("UDN_LABOR_WEEKEND", str(udn_labor_daily)))
+    udn_misc_rate = float(settings.get("UDN_MISC_PER_ORDER", "6.0"))
+    udn_opening_date = settings.get("UDN_OPENING_DATE", "2026-10-30")
+
     # Fetch FB Ads in range
     cur.execute("""
         SELECT 
             COALESCE(SUM(online_spend), 0.0) as online_ads,
             COALESCE(SUM(kkc_spend), 0.0) as kkc_ads,
             COALESCE(SUM(korat_spend), 0.0) as korat_ads,
+            COALESCE(SUM(udn_spend), 0.0) as udn_ads,
             COALESCE(SUM(total_spend), 0.0) as total_ads
         FROM daily_fb_ads
         WHERE date >= ? AND date <= ?
@@ -71,6 +83,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     fb_online_spend = float(fb_row["online_ads"])
     fb_kkc_spend = float(fb_row["kkc_ads"])
     fb_korat_spend = float(fb_row["korat_ads"]) if "korat_ads" in fb_row.keys() else 0.0
+    fb_udn_spend = float(fb_row["udn_ads"]) if "udn_ads" in fb_row.keys() else 0.0
 
     # Fetch Orders in range
     cur.execute("""
@@ -82,6 +95,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     online_orders = [o for o in all_orders if o["source_channel"] == "online"]
     kkc_orders = [o for o in all_orders if o["source_channel"] in ["kkc", "storefront_kkc"]]
     korat_orders = [o for o in all_orders if o["source_channel"] in ["korat", "storefront_korat"]]
+    udn_orders = [o for o in all_orders if o["source_channel"] in ["udn", "storefront_udn", "udon"]]
 
     # 1. ONLINE CHANNEL CALCULATION
     online_orders_count = len(online_orders)
@@ -144,15 +158,39 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     korat_net_profit = korat_gross_profit - korat_expenses
     korat_net_margin = (korat_net_profit / korat_gross_sales * 100) if korat_gross_sales > 0 else 0.0
 
-    # 4. CONSOLIDATED
-    cons_orders_count = online_orders_count + kkc_orders_count + korat_orders_count
-    cons_pieces = online_pieces + kkc_pieces + korat_pieces
-    cons_gross_sales = online_gross_sales + kkc_gross_sales + korat_gross_sales
-    cons_cogs = online_cogs + kkc_cogs + korat_cogs
+    # 4. UDN STOREFRONT CALCULATION
+    udn_orders_count = len(udn_orders)
+    udn_pieces = sum(o["total_pieces"] for o in udn_orders)
+    udn_gross_sales = sum(o["total_sales"] for o in udn_orders)
+    udn_cogs = sum(o["cogs_total"] for o in udn_orders)
+    udn_gross_profit = udn_gross_sales - udn_cogs
+    udn_gross_margin = (udn_gross_profit / udn_gross_sales * 100) if udn_gross_sales > 0 else 0.0
+
+    active_udn_dates = [d for d in dates_list if d.strftime("%Y-%m-%d") >= udn_opening_date]
+    udn_rent = sum(get_udn_daily_rent(d) for d in active_udn_dates)
+    udn_rent_desc = f"{get_udn_daily_rent(dates_list[0]):,.2f} บ./วัน" if days_count == 1 else f"สัญญา 32,100 บ./เดือน ({udn_rent:,.2f} บ.)"
+    
+    udn_labor = sum(udn_labor_weekend if d.weekday() in [4, 5, 6] else udn_labor_weekday for d in active_udn_dates)
+    if udn_labor_weekday == udn_labor_weekend:
+        udn_labor_desc = f"{udn_labor_weekday:,.0f} บ./วัน"
+    else:
+        udn_labor_desc = f"จ-พฤ {udn_labor_weekday:,.0f} / ศ-อา {udn_labor_weekend:,.0f} บ."
+
+    udn_misc = udn_orders_count * udn_misc_rate
+    udn_ads = fb_udn_spend
+    udn_expenses = udn_rent + udn_labor + udn_misc + udn_ads
+    udn_net_profit = udn_gross_profit - udn_expenses
+    udn_net_margin = (udn_net_profit / udn_gross_sales * 100) if udn_gross_sales > 0 else 0.0
+
+    # 5. CONSOLIDATED
+    cons_orders_count = online_orders_count + kkc_orders_count + korat_orders_count + udn_orders_count
+    cons_pieces = online_pieces + kkc_pieces + korat_pieces + udn_pieces
+    cons_gross_sales = online_gross_sales + kkc_gross_sales + korat_gross_sales + udn_gross_sales
+    cons_cogs = online_cogs + kkc_cogs + korat_cogs + udn_cogs
     cons_gross_profit = cons_gross_sales - cons_cogs
     cons_gross_margin = (cons_gross_profit / cons_gross_sales * 100) if cons_gross_sales > 0 else 0.0
 
-    cons_expenses = online_expenses + kkc_expenses + korat_expenses
+    cons_expenses = online_expenses + kkc_expenses + korat_expenses + udn_expenses
     cons_net_profit = cons_gross_profit - cons_expenses
     cons_net_margin = (cons_net_profit / cons_gross_sales * 100) if cons_gross_sales > 0 else 0.0
 
@@ -249,6 +287,34 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             "transfer_amount": korat_gross_sales
         }
 
+    elif channel in ["udn", "storefront_udn", "udon"]:
+        target_sales = udn_gross_sales
+        pnl_lines = [
+            {"label": "1. ยอดขายหน้าร้านเซนทรัล อุดรธานี (UDN Sales)", "amount": udn_gross_sales, "pct": 100.0, "type": "revenue", "bold": True},
+            {"label": "2. หัก ต้นทุนสินค้าหน้าร้าน (COGS)", "amount": udn_cogs, "pct": pct(udn_cogs, target_sales), "type": "cost", "bold": True},
+            {"label": "3. กำไรขั้นต้นหน้าร้าน อุดรธานี (Gross Profit)", "amount": udn_gross_profit, "pct": udn_gross_margin, "type": "gross_profit", "bold": True},
+            {"label": "4. ค่าใช้จ่ายหน้าร้าน อุดรธานี (Store Expenses):", "amount": udn_expenses, "pct": pct(udn_expenses, target_sales), "type": "header", "bold": True},
+            {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล อุดรธานี ({udn_rent_desc})", "amount": udn_rent, "pct": pct(udn_rent, target_sales), "type": "expense"},
+            {"label": f"   - ค่าพนักงานหน้าร้าน เซนทรัล อุดรธานี ({udn_labor_desc})", "amount": udn_labor, "pct": pct(udn_labor, target_sales), "type": "expense"},
+            {"label": "   - ค่าแอด Facebook Ads (เฉพาะแคมเปญอุดร)", "amount": udn_ads, "pct": pct(udn_ads, target_sales), "type": "expense"},
+            {"label": "   - ค่าจิปาถะ/ถุงใส่สินค้า (6 บ./ออเดอร์)", "amount": udn_misc, "pct": pct(udn_misc, target_sales), "type": "expense"},
+            {"label": "5. กำไรสุทธิหน้าร้าน เซนทรัล อุดรธานี (Net Profit)", "amount": udn_net_profit, "pct": udn_net_margin, "type": "net_profit", "bold": True}
+        ]
+        kpi = {
+            "sales": udn_gross_sales,
+            "cogs": udn_cogs,
+            "gross_profit": udn_gross_profit,
+            "gross_margin": round(udn_gross_margin, 2),
+            "expenses": udn_expenses,
+            "expenses_pct": pct(udn_expenses, target_sales),
+            "net_profit": udn_net_profit,
+            "net_margin": round(udn_net_margin, 2),
+            "orders_count": udn_orders_count,
+            "pieces_count": udn_pieces,
+            "cod_amount": 0.0,
+            "transfer_amount": udn_gross_sales
+        }
+
     else: # Consolidated
         target_sales = cons_gross_sales
         pnl_lines = [
@@ -256,6 +322,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": "   [ออนไลน์] ยอดขายช่องทางออนไลน์", "amount": online_gross_sales, "pct": pct(online_gross_sales, target_sales), "type": "sub"},
             {"label": "   [หน้าร้าน] ยอดขายหน้าร้านเซนทรัล KKC", "amount": kkc_gross_sales, "pct": pct(kkc_gross_sales, target_sales), "type": "sub"},
             {"label": "   [หน้าร้าน] ยอดขายหน้าร้านเซนทรัล โคราช", "amount": korat_gross_sales, "pct": pct(korat_gross_sales, target_sales), "type": "sub"},
+            {"label": "   [หน้าร้าน] ยอดขายหน้าร้านเซนทรัล อุดรธานี", "amount": udn_gross_sales, "pct": pct(udn_gross_sales, target_sales), "type": "sub"},
             {"label": "2. หัก ต้นทุนสินค้ารวมทั้งบริษัท (Total COGS)", "amount": cons_cogs, "pct": pct(cons_cogs, target_sales), "type": "cost", "bold": True},
             {"label": "3. รวมกำไรขั้นต้น (Consolidated Gross Profit)", "amount": cons_gross_profit, "pct": cons_gross_margin, "type": "gross_profit", "bold": True},
             {"label": "4. ค่าใช้จ่ายช่องทางออนไลน์ (Online Expenses):", "amount": online_expenses, "pct": pct(online_expenses, target_sales), "type": "header", "bold": True},
@@ -274,7 +341,12 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": f"   - ค่าคนหน้าร้านเซนทรัล โคราช ({korat_labor_desc})", "amount": korat_labor, "pct": pct(korat_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads หน้าร้าน โคราช", "amount": korat_ads, "pct": pct(korat_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน โคราช (6 บ./ออเดอร์)", "amount": korat_misc, "pct": pct(korat_misc, target_sales), "type": "expense"},
-            {"label": "7. กำไรสุทธิรวมทั้งบริษัท (Consolidated Net Profit)", "amount": cons_net_profit, "pct": cons_net_margin, "type": "net_profit", "bold": True}
+            {"label": "7. ค่าใช้จ่ายหน้าร้านเซนทรัล อุดรธานี (UDN Expenses):", "amount": udn_expenses, "pct": pct(udn_expenses, target_sales), "type": "header", "bold": True},
+            {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล อุดรธานี ({udn_rent_desc})", "amount": udn_rent, "pct": pct(udn_rent, target_sales), "type": "expense"},
+            {"label": f"   - ค่าคนหน้าร้านเซนทรัล อุดรธานี ({udn_labor_desc})", "amount": udn_labor, "pct": pct(udn_labor, target_sales), "type": "expense"},
+            {"label": "   - ค่าแอด Facebook Ads หน้าร้าน อุดรธานี", "amount": udn_ads, "pct": pct(udn_ads, target_sales), "type": "expense"},
+            {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน อุดรธานี (6 บ./ออเดอร์)", "amount": udn_misc, "pct": pct(udn_misc, target_sales), "type": "expense"},
+            {"label": "8. กำไรสุทธิรวมทั้งบริษัท (Consolidated Net Profit)", "amount": cons_net_profit, "pct": cons_net_margin, "type": "net_profit", "bold": True}
         ]
         kpi = {
             "sales": cons_gross_sales,
@@ -290,16 +362,19 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             "online_sales": online_gross_sales,
             "kkc_sales": kkc_gross_sales,
             "korat_sales": korat_gross_sales,
+            "udn_sales": udn_gross_sales,
             "online_net_profit": online_net_profit,
             "kkc_net_profit": kkc_net_profit,
             "korat_net_profit": korat_net_profit,
+            "udn_net_profit": udn_net_profit,
             "online_expenses": online_expenses,
             "kkc_expenses": kkc_expenses,
-            "korat_expenses": korat_expenses
+            "korat_expenses": korat_expenses,
+            "udn_expenses": udn_expenses
         }
 
     # 4. ADMIN LEADERBOARD & BREAKDOWN
-    target_orders = online_orders if channel == "online" else (kkc_orders if channel in ["kkc", "storefront_kkc"] else (korat_orders if channel in ["korat", "storefront_korat"] else all_orders))
+    target_orders = online_orders if channel == "online" else (kkc_orders if channel in ["kkc", "storefront_kkc"] else (korat_orders if channel in ["korat", "storefront_korat"] else (udn_orders if channel in ["udn", "storefront_udn", "udon"] else all_orders)))
     admin_map: Dict[str, Dict[str, Any]] = {}
     for o in target_orders:
         name = o["sender_name"] or "ไม่ระบุแอดมิน"
@@ -348,8 +423,8 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     sku_list = sorted(sku_breakdown.values(), key=lambda x: x["total_pieces"], reverse=True)
 
     # 6. DAILY TREND IN RANGE (Includes daily fixed costs and daily expenses)
-    cur.execute("SELECT date, online_spend, kkc_spend, korat_spend FROM daily_fb_ads WHERE date >= ? AND date <= ?", (start_date, end_date))
-    daily_ads_map = {r["date"]: (float(r["online_spend"]), float(r["kkc_spend"]), float(r["korat_spend"] or 0.0)) for r in cur.fetchall()}
+    cur.execute("SELECT date, online_spend, kkc_spend, korat_spend, COALESCE(udn_spend, 0.0) as udn_spend FROM daily_fb_ads WHERE date >= ? AND date <= ?", (start_date, end_date))
+    daily_ads_map = {r["date"]: (float(r["online_spend"]), float(r["kkc_spend"]), float(r["korat_spend"] or 0.0), float(r["udn_spend"] or 0.0)) for r in cur.fetchall()}
 
     daily_trend = []
     for d in dates_list:
@@ -363,6 +438,8 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             ch_orders = [o for o in d_orders if o["source_channel"] in ["kkc", "storefront_kkc"]]
         elif channel in ["korat", "storefront_korat"]:
             ch_orders = [o for o in d_orders if o["source_channel"] in ["korat", "storefront_korat"]]
+        elif channel in ["udn", "storefront_udn", "udon"]:
+            ch_orders = [o for o in d_orders if o["source_channel"] in ["udn", "storefront_udn", "udon"]]
         else:
             ch_orders = d_orders
 
@@ -372,10 +449,11 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
         d_gross_profit = d_sales - d_cogs
 
         # Calculate daily expenses for date d
-        on_ads, kkc_ads_val, korat_ads_val = daily_ads_map.get(d_str, (0.0, 0.0, 0.0))
+        on_ads, kkc_ads_val, korat_ads_val, udn_ads_val = daily_ads_map.get(d_str, (0.0, 0.0, 0.0, 0.0))
         d_online_orders = [o for o in d_orders if o["source_channel"] == "online"]
         d_kkc_orders = [o for o in d_orders if o["source_channel"] in ["kkc", "storefront_kkc"]]
         d_korat_orders = [o for o in d_orders if o["source_channel"] in ["korat", "storefront_korat"]]
+        d_udn_orders = [o for o in d_orders if o["source_channel"] in ["udn", "storefront_udn", "udon"]]
 
         d_on_exp = (
             online_labor_rate +
@@ -401,14 +479,24 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             korat_ads_val
         )
 
+        d_udn_labor = udn_labor_daily if d_str >= udn_opening_date else 0.0
+        d_udn_exp = (
+            get_udn_daily_rent(d) +
+            d_udn_labor +
+            (len(d_udn_orders) * udn_misc_rate) +
+            udn_ads_val
+        )
+
         if channel == "online":
             d_expenses = d_on_exp
         elif channel in ["kkc", "storefront_kkc"]:
             d_expenses = d_kkc_exp
         elif channel in ["korat", "storefront_korat"]:
             d_expenses = d_korat_exp
+        elif channel in ["udn", "storefront_udn", "udon"]:
+            d_expenses = d_udn_exp
         else:
-            d_expenses = d_on_exp + d_kkc_exp + d_korat_exp
+            d_expenses = d_on_exp + d_kkc_exp + d_korat_exp + d_udn_exp
 
         d_net_profit = d_gross_profit - d_expenses
 
