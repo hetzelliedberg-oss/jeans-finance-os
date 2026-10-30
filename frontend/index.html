@@ -145,6 +145,10 @@
             <i data-lucide="store" class="w-3.5 h-3.5"></i>
             <span>หน้าร้านเซนทรัล โคราช</span>
           </button>
+          <button onclick="setChannel('udn')" id="ch-udn" class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1">
+            <i data-lucide="store" class="w-3.5 h-3.5"></i>
+            <span>หน้าร้านเซนทรัล อุดรธานี</span>
+          </button>
           <button onclick="setChannel('consolidated')" id="ch-consolidated" class="px-2.5 py-1 rounded-md font-medium text-slate-400 hover:text-white transition">
             <span>งบรวมทั้งบริษัท</span>
           </button>
@@ -152,9 +156,9 @@
 
         <!-- Date Presets with Unique IDs -->
         <div class="flex items-center gap-1 bg-slate-950 px-1.5 py-1 rounded-lg border border-slate-800 text-xs">
-          <button onclick="setDatePreset('today')" id="preset-today" class="preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition">วันนี้ (25 ต.ค.)</button>
-          <button onclick="setDatePreset('yesterday')" id="preset-yesterday" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">เมื่อวาน (24 ต.ค.)</button>
-          <button onclick="setDatePreset('23oct')" id="preset-23oct" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">23 ต.ค. (เปิดร้าน)</button>
+          <button onclick="setDatePreset('today')" id="preset-today" class="preset-btn px-2 py-0.5 rounded text-white bg-slate-800 font-medium shadow-sm transition">วันนี้ (31 ต.ค.)</button>
+          <button onclick="setDatePreset('30oct')" id="preset-30oct" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">30 ต.ค. (เปิดอุดร)</button>
+          <button onclick="setDatePreset('23oct')" id="preset-23oct" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">23 ต.ค. (เปิดโคราช)</button>
           <button onclick="setDatePreset('oct')" id="preset-oct" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">ทั้งเดือน ต.ค. 26</button>
           <button onclick="setDatePreset('sep')" id="preset-sep" class="preset-btn px-2 py-0.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition">ก.ย. 26</button>
         </div>
@@ -744,6 +748,37 @@
           </div>
         </div>
 
+        <!-- Storefront UDN Settings -->
+        <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
+          <h3 class="text-sm font-semibold text-emerald-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+            <i data-lucide="store" class="w-4 h-4"></i>
+            <span>อัตราค่าใช้จ่าย: หน้าร้านเซนทรัล อุดรธานี (UDN)</span>
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าเช่าพื้นที่สัญญา (บาท/เดือน):</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingUdnRentMonthly" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="32100">
+                <span class="text-xs text-slate-400">บ./เดือน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าพนักงานหน้าร้านประจำวัน:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingUdnLaborDaily" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="460">
+                <span class="text-xs text-slate-400">บ./วัน</span>
+              </div>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 block mb-1">ค่าจิปาถะ/ถุงใส่สินค้าต่อออเดอร์:</label>
+              <div class="flex items-center gap-2">
+                <input type="number" id="settingUdnMisc" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="6">
+                <span class="text-xs text-slate-400">บ./ออเดอร์</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Connection Settings -->
         <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-4">
           <h3 class="text-sm font-semibold text-indigo-400 flex items-center gap-2 border-b border-slate-800 pb-2">
@@ -800,6 +835,7 @@
             <option value="online">💻 ออนไลน์ ออฟฟิต (Online Office)</option>
             <option value="kkc">🏬 หน้าร้านเซนทรัล KKC</option>
             <option value="korat">🏬 หน้าร้านเซนทรัล โคราช</option>
+            <option value="udn">🏬 หน้าร้านเซนทรัล อุดรธานี</option>
           </select>
         </div>
         <div>
@@ -987,6 +1023,8 @@ xrp55 2 ตัว
             <span class="text-[11px] text-slate-400">บันทึกเข้า:</span>
             <select id="onedrivePasteChannel" class="bg-slate-950 border border-slate-700 rounded px-2.5 py-1 text-slate-200 text-xs">
               <option value="storefront_kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+              <option value="storefront_korat">🏬 หน้าร้านเซนทรัล โคราช</option>
+              <option value="storefront_udn">🏬 หน้าร้านเซนทรัล อุดรธานี</option>
               <option value="online">💻 ออนไลน์ ออฟฟิต</option>
             </select>
           </div>
@@ -1019,6 +1057,8 @@ xrp55 2 ตัว
             <label class="text-slate-400 block mb-1">ช่องทางสำหรับไฟล์นี้:</label>
             <select id="onedriveChannelSelect" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
               <option value="storefront_kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+              <option value="storefront_korat">🏬 หน้าร้านเซนทรัล โคราช</option>
+              <option value="storefront_udn">🏬 หน้าร้านเซนทรัล อุดรธานี</option>
               <option value="online">💻 ออนไลน์ ออฟฟิต</option>
               <option value="both">⚡ อัตโนมัติ (ตรวจตามชีต)</option>
             </select>
@@ -1155,6 +1195,8 @@ xrp55 2 ตัว
             <label class="text-slate-400 block mb-1">บันทึกเข้าช่องทาง:</label>
             <select id="tgSyncTargetChannel" class="w-full bg-slate-950 border border-slate-700 rounded px-3 py-2 text-slate-200">
               <option value="storefront_kkc">🏬 หน้าร้านเซนทรัล KKC</option>
+              <option value="storefront_korat">🏬 หน้าร้านเซนทรัล โคราช</option>
+              <option value="storefront_udn">🏬 หน้าร้านเซนทรัล อุดรธานี</option>
               <option value="online">💻 ออนไลน์ ออฟฟิต</option>
             </select>
           </div>
@@ -1298,7 +1340,7 @@ xrp55 2 ตัว
 
     function setChannel(ch) {
       currentChannel = ch;
-      ['online', 'kkc', 'korat', 'consolidated'].forEach(c => {
+      ['online', 'kkc', 'korat', 'udn', 'consolidated'].forEach(c => {
         const btn = document.getElementById(`ch-${c}`);
         if (btn) {
           if (c === ch) {
@@ -1341,7 +1383,7 @@ xrp55 2 ตัว
 
       let today = new Date();
       if (today.getFullYear() < 2026) {
-        today = new Date(2026, 9, 26);
+        today = new Date(2026, 9, 31);
       }
       const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       const todayStr = fmt(today);
@@ -1363,6 +1405,9 @@ xrp55 2 ตัว
       } else if (preset === 'yesterday') {
         startStr = yesterdayStr;
         endStr = yesterdayStr;
+      } else if (preset === '30oct') {
+        startStr = "2026-10-30";
+        endStr = "2026-10-30";
       } else if (preset === '23oct') {
         startStr = "2026-10-23";
         endStr = "2026-10-23";
@@ -1458,7 +1503,7 @@ xrp55 2 ตัว
       const end = document.getElementById("inputEndDate").value;
       updateActivePeriodBadge();
 
-      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : 'งบรวมทั้งบริษัท'));
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : (currentChannel === 'udn' ? 'หน้าร้านเซนทรัล อุดรธานี' : 'งบรวมทั้งบริษัท')));
       const subtitleEl = document.getElementById("pnlPeriodSubtitle");
       if (subtitleEl) {
         subtitleEl.innerText = `ช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel}`;
@@ -1659,7 +1704,7 @@ xrp55 2 ตัว
       if (!data) return;
       const start = document.getElementById("inputStartDate").value;
       const end = document.getElementById("inputEndDate").value;
-      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : 'งบรวมทั้งบริษัท'));
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : (currentChannel === 'udn' ? 'หน้าร้านเซนทรัล อุดรธานี' : 'งบรวมทั้งบริษัท')));
       const subEl = document.getElementById("adminsPeriodSubtitle");
       if (subEl) {
         if (start === end) {
@@ -1756,6 +1801,8 @@ xrp55 2 ตัว
           let channelBadge = `<span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 font-medium">ออนไลน์</span>`;
           if (o.source_channel === "korat" || o.source_channel === "storefront_korat") {
             channelBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">🏬 โคราช</span>`;
+          } else if (o.source_channel === "udn" || o.source_channel === "storefront_udn" || o.source_channel === "udon") {
+            channelBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">🏬 อุดรธานี</span>`;
           } else if (o.source_channel === "kkc" || o.source_channel === "storefront_kkc") {
             channelBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold">🏬 ขอนแก่น</span>`;
           }
@@ -1908,7 +1955,7 @@ xrp55 2 ตัว
     // ---------------- MODAL 1: SCAN PASTED TEXT ---------------- //
     function openScanModal() {
       document.getElementById("scanDate").value = document.getElementById("inputStartDate").value;
-      document.getElementById("scanChannel").value = (currentChannel === 'kkc' || currentChannel === 'korat') ? currentChannel : 'online';
+      document.getElementById("scanChannel").value = (currentChannel === 'kkc' || currentChannel === 'korat' || currentChannel === 'udn') ? currentChannel : 'online';
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("scanModal").classList.add("flex");
     }
@@ -2102,7 +2149,7 @@ xrp55 2 ตัว
       if (!recData) return;
       const subEl = document.getElementById("reconcileSubtitle");
       if (subEl) {
-        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : (currentChannel === 'korat' ? 'หน้าร้าน โคราช' : 'งบรวม'));
+        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : (currentChannel === 'korat' ? 'หน้าร้าน โคราช' : (currentChannel === 'udn' ? 'หน้าร้าน อุดรธานี' : 'งบรวม')));
         subEl.innerText = `เปรียบเทียบยอดขายรายวันระหว่างฐานข้อมูลแชทกับไฟล์ปิดวัน OneDrive • ช่วง: ${recData.date_range.start} ถึง ${recData.date_range.end} • ช่องทาง: ${chName}`;
       }
 
@@ -2565,6 +2612,10 @@ xrp55 2 ตัว
         document.getElementById("settingKoratLaborWeekend").value = s.KORAT_LABOR_WEEKEND || s.KORAT_LABOR_DAILY || "460";
         document.getElementById("settingKoratMisc").value = s.KORAT_MISC_PER_ORDER || "6";
 
+        document.getElementById("settingUdnRentMonthly").value = s.UDN_RENT_MONTHLY || "32100";
+        document.getElementById("settingUdnLaborDaily").value = s.UDN_LABOR_DAILY || "460";
+        document.getElementById("settingUdnMisc").value = s.UDN_MISC_PER_ORDER || "6";
+
         document.getElementById("settingFbAdAccount").value = s.AD_ACCOUNT_ID || "act_703804833399837";
         document.getElementById("settingTelegramToken").value = s.TELEGRAM_BOT_TOKEN || "";
         const mToken = document.getElementById("modalTgBotToken");
@@ -2593,6 +2644,10 @@ xrp55 2 ตัว
         KORAT_LABOR_WEEKEND: document.getElementById("settingKoratLaborWeekend").value,
         KORAT_LABOR_DAILY: document.getElementById("settingKoratLaborWeekday").value,
         KORAT_MISC_PER_ORDER: document.getElementById("settingKoratMisc").value,
+
+        UDN_RENT_MONTHLY: document.getElementById("settingUdnRentMonthly").value,
+        UDN_LABOR_DAILY: document.getElementById("settingUdnLaborDaily").value,
+        UDN_MISC_PER_ORDER: document.getElementById("settingUdnMisc").value,
 
         AD_ACCOUNT_ID: document.getElementById("settingFbAdAccount").value,
         TELEGRAM_BOT_TOKEN: document.getElementById("settingTelegramToken").value,
