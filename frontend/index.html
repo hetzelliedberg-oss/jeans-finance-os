@@ -756,10 +756,10 @@
           </h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label class="text-xs text-slate-400 block mb-1">ค่าเช่าพื้นที่สัญญา (บาท/เดือน):</label>
+              <label class="text-xs text-slate-400 block mb-1">ค่าเช่าพื้นที่หน้าร้านต่อวัน:</label>
               <div class="flex items-center gap-2">
-                <input type="number" id="settingUdnRentMonthly" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="32100">
-                <span class="text-xs text-slate-400">บ./เดือน</span>
+                <input type="number" id="settingUdnRentDaily" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-white" placeholder="850">
+                <span class="text-xs text-slate-400">บ./วัน</span>
               </div>
             </div>
             <div>
@@ -2612,7 +2612,7 @@ xrp55 2 ตัว
         document.getElementById("settingKoratLaborWeekend").value = s.KORAT_LABOR_WEEKEND || s.KORAT_LABOR_DAILY || "460";
         document.getElementById("settingKoratMisc").value = s.KORAT_MISC_PER_ORDER || "6";
 
-        document.getElementById("settingUdnRentMonthly").value = s.UDN_RENT_MONTHLY || "32100";
+        document.getElementById("settingUdnRentDaily").value = s.UDN_RENT_DAILY || "850";
         document.getElementById("settingUdnLaborDaily").value = s.UDN_LABOR_DAILY || "460";
         document.getElementById("settingUdnMisc").value = s.UDN_MISC_PER_ORDER || "6";
 
@@ -2645,7 +2645,8 @@ xrp55 2 ตัว
         KORAT_LABOR_DAILY: document.getElementById("settingKoratLaborWeekday").value,
         KORAT_MISC_PER_ORDER: document.getElementById("settingKoratMisc").value,
 
-        UDN_RENT_MONTHLY: document.getElementById("settingUdnRentMonthly").value,
+        UDN_RENT_DAILY: document.getElementById("settingUdnRentDaily").value,
+        UDN_RENT_MONTHLY: (parseFloat(document.getElementById("settingUdnRentDaily").value || "850") * 31).toString(),
         UDN_LABOR_DAILY: document.getElementById("settingUdnLaborDaily").value,
         UDN_MISC_PER_ORDER: document.getElementById("settingUdnMisc").value,
 
