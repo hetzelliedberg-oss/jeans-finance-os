@@ -48,8 +48,13 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
         return round(korat_rent_monthly / days_in_m, 2)
 
     def get_udn_daily_rent(dt: datetime) -> float:
+        if "UDN_RENT_DAILY" in settings and settings["UDN_RENT_DAILY"]:
+            try:
+                return float(settings["UDN_RENT_DAILY"])
+            except ValueError:
+                pass
         days_in_m = calendar.monthrange(dt.year, dt.month)[1]
-        udn_rent_monthly = float(settings.get("UDN_RENT_MONTHLY", "32100.0"))
+        udn_rent_monthly = float(settings.get("UDN_RENT_MONTHLY", "26350.0"))
         return round(udn_rent_monthly / days_in_m, 2)
 
     kkc_labor_weekday = float(settings.get("KKC_LABOR_WEEKDAY", "460.0"))
@@ -168,7 +173,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
 
     active_udn_dates = [d for d in dates_list if d.strftime("%Y-%m-%d") >= udn_opening_date]
     udn_rent = sum(get_udn_daily_rent(d) for d in active_udn_dates)
-    udn_rent_desc = f"{get_udn_daily_rent(dates_list[0]):,.2f} บ./วัน" if days_count == 1 else f"สัญญา 32,100 บ./เดือน ({udn_rent:,.2f} บ.)"
+    udn_rent_desc = f"{get_udn_daily_rent(dates_list[0]):,.2f} บ./วัน" if days_count == 1 else f"วันละ {get_udn_daily_rent(dates_list[0]):,.0f} บ. ({udn_rent:,.2f} บ.)"
     
     udn_labor = sum(udn_labor_weekend if d.weekday() in [4, 5, 6] else udn_labor_weekday for d in active_udn_dates)
     if udn_labor_weekday == udn_labor_weekend:
@@ -479,9 +484,10 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             korat_ads_val
         )
 
+        d_udn_rent = get_udn_daily_rent(d) if d_str >= udn_opening_date else 0.0
         d_udn_labor = udn_labor_daily if d_str >= udn_opening_date else 0.0
         d_udn_exp = (
-            get_udn_daily_rent(d) +
+            d_udn_rent +
             d_udn_labor +
             (len(d_udn_orders) * udn_misc_rate) +
             udn_ads_val
