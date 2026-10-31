@@ -595,10 +595,21 @@ def parse_order_message(
             except Exception:
                 pass
 
+    cust_name = ""
+    phone = ""
+    m_name = re.search(r'(?:ชื่อ|ลูกค้า)\s*[:=]?\s*([^\n\r]+)', text)
+    if m_name:
+        cust_name = m_name.group(1).strip()
+    m_phone = re.search(r'(?:เบอร์|โทร|tel|phone)\s*[:=]?\s*([0-9\s\-]+)', text, re.IGNORECASE)
+    if m_phone:
+        phone = re.sub(r'[\s\-]', '', m_phone.group(1))
+
     return {
         "source_channel": source_channel,
         "message_id": message_id,
         "sender_name": admin_name,
+        "customer_name": cust_name,
+        "phone": phone,
         "order_date": final_date,
         "order_time": order_time,
         "raw_text": text.strip(),
