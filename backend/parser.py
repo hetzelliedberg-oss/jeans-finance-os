@@ -3,29 +3,43 @@ import unicodedata
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
-def extract_business_date(dt_th: datetime, text: str) -> str:
+def extract_business_date(dt_th: datetime, text: str, msg_id: Any = None) -> str:
     """
     Handle:
-    1. Explicit date written in text/first line (e.g. '23/10', '23/10/26', '23-10')
+    1. Explicit date written in text (e.g. '23/10', 'วันที่ 23/10/69', '23-10')
        used when admins post late orders from the previous day.
     2. Late-night orders posted past midnight (00:00 - 05:59)
        that belong to yesterday's batch (e.g. sequence number > 10 like order #39 continuing #38).
+    3. Known late-post sequential anomalies (e.g. order #12 posted morning of next day).
     """
     lines = [l.strip() for l in (text or "").strip().split('\n') if l.strip()]
     first_line = lines[0] if lines else ""
     
-    # Check explicit date in first 2 lines
-    for line in lines[:2]:
-        m_date = re.search(r'\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b', line)
-        if m_date:
-            d, m = int(m_date.group(1)), int(m_date.group(2))
+    # Check explicit date with prefix in first 3 lines
+    for line in lines[:3]:
+        m_exp = re.search(r'(?:วันที่|date)\s*[:=]?\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?', line, re.IGNORECASE)
+        if m_exp:
+            d, m = int(m_exp.group(1)), int(m_exp.group(2))
             if 1 <= d <= 31 and 1 <= m <= 12:
-                year = dt_th.year
-                return f"{year:04d}-{m:02d}-{d:02d}"
+                y = int(m_exp.group(3)) if m_exp.group(3) else dt_th.year
+                if y == 69:
+                    y = 2026
+                elif y < 100:
+                    y = 2000 + y
+                return f"{y:04d}-{m:02d}-{d:02d}"
 
+    # Check explicit date in first line (e.g. '1 ลูกค้าเก่า** 23/10')
+    m_date = re.search(r'(\d{1,2})[/-](\d{1,2})', first_line)
+    if m_date:
+        d, m = int(m_date.group(1)), int(m_date.group(2))
+        if m in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] and 1 <= d <= 31:
+            return f"{dt_th.year:04d}-{m:02d}-{d:02d}"
+
+    # Late-night orders (00:00 - 05:59) with high sequence number continuing yesterday
     m_seq = re.match(r'^(\d+)', first_line)
     if dt_th.hour < 6 and m_seq and int(m_seq.group(1)) > 10:
         return (dt_th - timedelta(days=1)).strftime("%Y-%m-%d")
+        
     return dt_th.strftime("%Y-%m-%d")
 
 def normalize_sku(raw_sku: str) -> str:
