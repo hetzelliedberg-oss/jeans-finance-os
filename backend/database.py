@@ -238,7 +238,8 @@ def init_db():
         "KORAT_MISC_PER_ORDER": "6.0",       # 6 THB / order bag
         "KORAT_OPENING_DATE": "2026-10-23",  # Grand Opening Date
 
-        "UDN_RENT_MONTHLY": "32100.0",       # Central Udon Thani rent
+        "UDN_RENT_DAILY": "850.0",           # Central Udon Thani rent 850 THB / day
+        "UDN_RENT_MONTHLY": "26350.0",       # 850 * 31 = 26,350 THB
         "UDN_LABOR_DAILY": "460.0",          # 460 THB / day
         "UDN_LABOR_WEEKDAY": "460.0",        # Mon-Thu 460 THB / day
         "UDN_LABOR_WEEKEND": "460.0",        # Fri-Sun 460 THB / day
