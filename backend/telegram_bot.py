@@ -7,7 +7,7 @@ import json
 from datetime import datetime
 from typing import Optional, Dict, Any
 from backend.database import get_settings, get_sku_cost_map
-from backend.parser import parse_order_message
+from backend.parser import parse_order_message, extract_business_date
 from backend.order_importer import save_order_to_db
 
 class TelegramBotWorker:
@@ -78,11 +78,12 @@ class TelegramBotWorker:
                     msg_id = str(msg.get("message_id", ""))
                     date_ts = msg.get("date", int(time.time()))
                     dt = datetime.fromtimestamp(date_ts)
-                    order_date = dt.strftime("%Y-%m-%d")
+                    order_date = extract_business_date(dt, text, msg_id)
                     order_time = dt.strftime("%Y-%m-%d %H:%M:%S")
 
                     korat_chat_id = settings.get("TELEGRAM_KORAT_CHAT_ID", "").strip()
                     udn_chat_id = settings.get("TELEGRAM_UDN_CHAT_ID", "-5325611582").strip()
+                    online_chat_id = settings.get("TELEGRAM_ONLINE_CHAT_ID", "-4242902075").strip()
 
                     # Identify channel & auto-register chat ID if matched
                     channel = "online"
@@ -103,9 +104,11 @@ class TelegramBotWorker:
                         "kkc" in chat_title.lower()
                     )
                     is_online_group = (
-                        (online_chat_id and chat_id == online_chat_id) or
+                        (online_chat_id and (chat_id == online_chat_id or chat_id == online_chat_id.replace("-100", "-"))) or
                         "ออนไลน์" in chat_title or
                         "online" in chat_title.lower() or
+                        "around 2" in chat_title.lower() or
+                        "jeans around" in chat_title.lower() or
                         "ออฟฟิต" in chat_title or
                         "ออฟฟิศ" in chat_title or
                         "office" in chat_title.lower()
