@@ -82,9 +82,16 @@ class TelegramBotWorker:
                     order_time = dt.strftime("%Y-%m-%d %H:%M:%S")
 
                     korat_chat_id = settings.get("TELEGRAM_KORAT_CHAT_ID", "").strip()
+                    udn_chat_id = settings.get("TELEGRAM_UDN_CHAT_ID", "-5325611582").strip()
 
                     # Identify channel & auto-register chat ID if matched
                     channel = "online"
+                    is_udn_group = (
+                        (udn_chat_id and (chat_id == udn_chat_id or chat_id == udn_chat_id.replace("-100", "-"))) or
+                        "อุดร" in chat_title or
+                        "udn" in chat_title.lower() or
+                        "udon" in chat_title.lower()
+                    )
                     is_korat_group = (
                         (korat_chat_id and chat_id == korat_chat_id) or
                         "โคราช" in chat_title or
@@ -104,7 +111,14 @@ class TelegramBotWorker:
                         "office" in chat_title.lower()
                     )
 
-                    if is_korat_group:
+                    if is_udn_group:
+                        channel = "udn"
+                        if not udn_chat_id or udn_chat_id != chat_id:
+                            from backend.database import update_setting
+                            update_setting("TELEGRAM_UDN_CHAT_ID", chat_id)
+                            udn_chat_id = chat_id
+                            print(f"[Telegram Bot] Auto-registered UDN chat_id={chat_id} ('{chat_title}')", flush=True)
+                    elif is_korat_group:
                         channel = "korat"
                         if not korat_chat_id or korat_chat_id != chat_id:
                             from backend.database import update_setting
