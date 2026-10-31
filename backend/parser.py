@@ -400,7 +400,7 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
     if not sku_line:
         return None
 
-    raw_skus = [s.strip() for s in re.split(r'[/+]\s*|,\s*(?=(?:AR|XRP|[A-Za-z]{2,})\d+)', sku_line, flags=re.IGNORECASE) if s.strip()]
+    raw_skus = [s.strip() for s in re.split(r'[/+]\s*|-(?=(?:AR|XRP|JA|[A-Za-z]{2,})\d+)|,\s*(?=(?:AR|XRP|[A-Za-z]{2,})\d+)', sku_line, flags=re.IGNORECASE) if s.strip()]
     raw_sizes = [s.strip() for s in re.split(r'[/,]\s*', sz_line) if s.strip()]
 
     items = []
