@@ -28,14 +28,15 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
 
     # Check if order exists by message_id; if exists and edited, update it!
     if msg_id:
-        cur.execute("SELECT id, raw_text, total_sales, total_pieces, cod_amount, transfer_amount FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
+        cur.execute("SELECT id, raw_text, total_sales, total_pieces, cod_amount, transfer_amount, order_date FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
         existing = cur.fetchone()
         if existing:
             existing_id = existing["id"]
             raw_new = (order_data.get("raw_text") or "").strip()
             raw_old = (existing["raw_text"] or "").strip()
-            # If text, sales, pieces, cod, or transfer changed -> update order and replace items!
+            # If date, text, sales, pieces, cod, or transfer changed -> update order and replace items!
             if (raw_new != raw_old or
+                order_date != existing["order_date"] or
                 abs(order_data.get("total_sales", 0.0) - (existing["total_sales"] or 0.0)) > 0.01 or
                 order_data.get("total_pieces", 1) != existing["total_pieces"] or
                 abs(order_data.get("cod_amount", 0.0) - (existing["cod_amount"] or 0.0)) > 0.01 or
@@ -53,7 +54,9 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
                         transfer_amount = ?,
                         cogs_total = ?,
                         commission_amount = ?,
-                        created_at = ?
+                        created_at = ?,
+                        customer_name = ?,
+                        phone = ?
                     WHERE id = ?
                 """, (
                     order_data.get("sender_name", "แอดมินทั่วไป"),
@@ -68,6 +71,8 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
                     order_data.get("cogs_total", 0.0),
                     order_data.get("commission_amount", 0.0),
                     now_str,
+                    order_data.get("customer_name", ""),
+                    order_data.get("phone", ""),
                     existing_id
                 ))
                 # Refresh items
@@ -107,8 +112,9 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
         INSERT INTO orders (
             source_channel, message_id, sender_name, order_date, order_time,
             raw_text, total_pieces, total_sales, payment_method, cod_amount,
-            transfer_amount, cogs_total, commission_amount, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?)
+            transfer_amount, cogs_total, commission_amount, status, created_at,
+            customer_name, phone
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)
     """, (
         channel,
         str(msg_id) if msg_id else None,
@@ -123,7 +129,9 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
         order_data.get("transfer_amount", 0.0),
         order_data.get("cogs_total", 0.0),
         order_data.get("commission_amount", 0.0),
-        now_str
+        now_str,
+        order_data.get("customer_name", ""),
+        order_data.get("phone", "")
     ))
 
     order_id = cur.lastrowid
@@ -159,7 +167,12 @@ def import_telegram_export_json(file_content: str, default_channel: str = "onlin
         return {"success": False, "error": f"Invalid JSON format: {str(e)}"}
 
     group_name = data.get("name", "")
-    channel = "kkc" if ("ขอนแก่น" in group_name or "kkc" in group_name.lower()) else default_channel
+    if "โคราช" in group_name or "korat" in group_name.lower():
+        channel = "korat"
+    elif "ขอนแก่น" in group_name or "kkc" in group_name.lower():
+        channel = "kkc"
+    else:
+        channel = default_channel
     messages = data.get("messages", [])
 
     sku_cost_map = get_sku_cost_map()
