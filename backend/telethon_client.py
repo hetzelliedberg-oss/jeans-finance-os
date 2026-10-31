@@ -14,8 +14,8 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SESSION_PATH = os.path.join(BASE_DIR, "data", "telethon_user")
 
 # Standard Telegram client credentials (can be overridden via settings)
-DEFAULT_API_ID = 2040
-DEFAULT_API_HASH = "b18441a1ff607e10a989891a5462e627"
+DEFAULT_API_ID = 20562622
+DEFAULT_API_HASH = "8ec7e8d2e87363f825227d6d37fbcf26"
 
 from backend.database import get_settings, update_setting, get_sku_cost_map, get_db_connection
 from backend.parser import parse_order_message, extract_business_date
