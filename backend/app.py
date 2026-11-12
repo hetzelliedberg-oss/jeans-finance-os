@@ -40,10 +40,11 @@ init_db()
 app = FastAPI(title="Jeans Around Finance OS", version="1.0.0")
 
 # CORS middleware
+_cors_origins = os.environ.get("CORS_ORIGINS", "").split(",") if os.environ.get("CORS_ORIGINS") else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=(_cors_origins != ["*"]),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -68,6 +69,7 @@ def _keepalive_loop():
     while True:
         try:
             _req.get(f"{RENDER_URL}/api/health", timeout=15)
+            _req.get("https://jeans-around-ai-chatbot.onrender.com/api/health", timeout=15)
             print(f"[Keepalive] ✅ {datetime.now().strftime('%H:%M')}", flush=True)
         except Exception as e:
             print(f"[Keepalive] ⚠ {e}", flush=True)
@@ -75,25 +77,38 @@ def _keepalive_loop():
 
 def _backup_db_to_github():
     """Push DB binary to GitHub every night at 02:00 so data survives Render restarts"""
+    import sqlite3, tempfile
     while True:
         now = datetime.now()
         # Sleep until next 02:00
         next_2am = now.replace(hour=2, minute=0, second=0, microsecond=0)
         if now >= next_2am:
-            next_2am = next_2am.replace(day=next_2am.day + 1)
+            next_2am = next_2am + timedelta(days=1)
         wait_sec = (next_2am - now).total_seconds()
         print(f"[DB Backup] Next backup at 02:00 (in {wait_sec/3600:.1f}h)", flush=True)
         time.sleep(wait_sec)
-        
-        if not GH_TOKEN:
+
+        token = GH_TOKEN or get_settings().get("GH_TOKEN", "")
+        if not token:
             print("[DB Backup] No GH_TOKEN set, skipping", flush=True)
             continue
+        tmp_path = None
         try:
-            with open(DB_PATH, "rb") as f:
+            with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
+                tmp_path = tmp.name
+            src_conn = sqlite3.connect(DB_PATH, timeout=30.0)
+            dst_conn = sqlite3.connect(tmp_path)
+            try:
+                src_conn.backup(dst_conn)
+            finally:
+                dst_conn.close()
+                src_conn.close()
+
+            with open(tmp_path, "rb") as f:
                 content = base64.b64encode(f.read()).decode()
             
             api = f"https://api.github.com/repos/{GH_REPO}/contents/data/finance_hub.db"
-            headers = {"Authorization": f"token {GH_TOKEN}", "Accept": "application/vnd.github.v3+json"}
+            headers = {"Authorization": f"token {token}", "Accept": "application/vnd.github.v3+json"}
             
             # Get current SHA
             r = _req.get(api, headers=headers, timeout=15)
@@ -114,6 +129,12 @@ def _backup_db_to_github():
                 print(f"[DB Backup] ⚠ GitHub API {r2.status_code}: {r2.text[:100]}", flush=True)
         except Exception as e:
             print(f"[DB Backup] ⚠ {e}", flush=True)
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
 threading.Thread(target=_keepalive_loop, daemon=True, name="keepalive").start()
 threading.Thread(target=_backup_db_to_github, daemon=True, name="db-backup").start()
@@ -458,8 +479,14 @@ def telegram_recent_messages(chat_id: int, limit: int = 40):
 
 @app.get("/api/telegram/download-media")
 def telegram_download_media(chat_id: int, msg_id: int, out_path: str):
-    """Download media file from Telegram message"""
-    p = telethon_manager.download_media_msg(chat_id, msg_id, out_path)
+    """Download media file from Telegram message safely inside data/media"""
+    media_root = os.path.realpath(os.path.join(BASE_DIR, "data", "media"))
+    os.makedirs(media_root, exist_ok=True)
+    safe_name = os.path.basename(out_path)
+    target_path = os.path.realpath(os.path.join(media_root, safe_name))
+    if not target_path.startswith(media_root + os.sep) and target_path != media_root:
+        raise HTTPException(status_code=400, detail="Invalid out_path")
+    p = telethon_manager.download_media_msg(chat_id, msg_id, target_path)
     return {"path": p, "found": bool(p)}
 
 
@@ -724,25 +751,61 @@ def delete_sku_cost(sku: str):
     return {"success": True, "deleted": sku}
 
 
+SECRET_SETTING_KEYS = {
+    "FB_ACCESS_TOKEN",
+    "TELEGRAM_BOT_TOKEN",
+    "TELETHON_STRING_SESSION",
+    "GH_TOKEN",
+    "GEMINI_API_KEY",
+    "PENDING_PHONE_CODE_HASH",
+}
+
+
+def _mask_secret(val: Any) -> str:
+    s = str(val or "")
+    if len(s) > 20:
+        return f"{s[:8]}...{s[-6:]}"
+    if len(s) > 6:
+        return f"{s[:3]}...{s[-2:]}"
+    return "***" if s else ""
+
+
 @app.get("/api/settings")
 def get_all_settings():
-    """Get all settings"""
+    """Get all settings with secret tokens masked"""
     settings = get_settings()
-    # Mask token for security
-    fb_tok = settings.get("FB_ACCESS_TOKEN", "")
-    masked_fb = f"{fb_tok[:10]}...{fb_tok[-6:]}" if len(fb_tok) > 20 else fb_tok
+    masked_settings = {
+        k: (_mask_secret(v) if k in SECRET_SETTING_KEYS and v else v)
+        for k, v in settings.items()
+    }
     return {
-        "settings": settings,
-        "fb_token_masked": masked_fb
+        "settings": masked_settings,
+        "fb_token_masked": _mask_secret(settings.get("FB_ACCESS_TOKEN", ""))
     }
 
 
 @app.post("/api/settings")
 def save_settings(req: SettingsUpdateRequest):
-    """Update settings"""
+    """Update settings, ignoring masked secret placeholders"""
+    updated = []
     for k, v in req.settings.items():
+        if k in SECRET_SETTING_KEYS and isinstance(v, str) and ("..." in v or v == "***"):
+            continue
         update_setting(k, v)
-    return {"success": True, "updated": list(req.settings.keys())}
+        updated.append(k)
+    return {"success": True, "updated": updated}
+
+
+class AiChatRequest(BaseModel):
+    prompt: str
+    model: Optional[str] = None
+
+
+@app.post("/api/ai/chat")
+def ai_chat_endpoint(req: AiChatRequest):
+    """Query the upgraded AI CFO & Growth Strategist engine"""
+    from backend.ai_engine import execute_chat_query
+    return execute_chat_query(req.prompt, model_name=req.model)
 
 
 # ---------------- SERVE STATIC FRONTEND ---------------- #
