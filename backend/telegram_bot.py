@@ -67,6 +67,11 @@ class TelegramBotWorker:
                     if not msg:
                         continue
 
+                    from_user = msg.get("from", {}) or {}
+                    from_uname = (from_user.get("username") or "").lower()
+                    if from_user.get("is_bot") or msg.get("via_bot") or from_uname.endswith("bot"):
+                        continue
+
                     text = msg.get("text", "") or msg.get("caption", "")
                     if not text:
                         continue
