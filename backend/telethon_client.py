@@ -22,6 +22,20 @@ from backend.parser import parse_order_message, extract_business_date
 from backend.order_importer import save_order_to_db
 
 
+def _is_bot_message(sender: Any, msg: Any = None) -> bool:
+    """Ignore Telegram bot messages (e.g. kkcaround_bot) so only human admin orders count."""
+    if msg is not None and getattr(msg, "via_bot_id", None) is not None:
+        return True
+    if sender is not None:
+        if getattr(sender, "bot", False):
+            return True
+        uname = (getattr(sender, "username", "") or "").lower()
+        fname = (getattr(sender, "first_name", "") or "").lower()
+        if uname.endswith("bot") or "kkcaround_bot" in uname or "kkcaround_bot" in fname:
+            return True
+    return False
+
+
 class TelethonManager:
     def __init__(self):
         self.loop = asyncio.new_event_loop()
@@ -272,14 +286,17 @@ class TelethonManager:
                     if not text.strip():
                         continue
 
-                    # Extract sender name
+                    # Extract sender name and skip bot messages
                     sender_name = ""
+                    sender = None
                     try:
                         sender = await msg.get_sender()
                         if sender:
                             sender_name = getattr(sender, "first_name", "") or getattr(sender, "title", "")
                     except Exception:
                         pass
+                    if _is_bot_message(sender, msg):
+                        continue
 
                     date_str = dt_th.strftime("%Y-%m-%d")
                     time_str = dt_th.strftime("%Y-%m-%d %H:%M:%S")
@@ -379,6 +396,8 @@ class TelethonManager:
                     channel = "kkc"
 
                 sender = await event.get_sender()
+                if _is_bot_message(sender, event.message):
+                    return
                 sender_name = getattr(sender, "first_name", "") or ""
 
                 tz_th = timezone(timedelta(hours=7))
