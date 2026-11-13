@@ -22,12 +22,18 @@ from backend.parser import parse_order_message, extract_business_date
 from backend.order_importer import save_order_to_db
 
 
+KNOWN_BOT_IDS = {8582637848}  # kkcaround_bot
+
+
 def _is_bot_message(sender: Any, msg: Any = None) -> bool:
     """Ignore Telegram bot messages (e.g. kkcaround_bot) so only human admin orders count."""
-    if msg is not None and getattr(msg, "via_bot_id", None) is not None:
-        return True
+    if msg is not None:
+        if getattr(msg, "via_bot_id", None) is not None:
+            return True
+        if getattr(msg, "sender_id", None) in KNOWN_BOT_IDS:
+            return True
     if sender is not None:
-        if getattr(sender, "bot", False):
+        if getattr(sender, "id", None) in KNOWN_BOT_IDS or getattr(sender, "bot", False):
             return True
         uname = (getattr(sender, "username", "") or "").lower()
         fname = (getattr(sender, "first_name", "") or "").lower()
@@ -471,14 +477,23 @@ class TelethonManager:
                     async for msg in self.client.iter_messages(entity, offset_date=datetime.now(timezone.utc)):
                         if msg.date < start_utc:
                             break
+                        sender = None
+                        try:
+                            sender = await msg.get_sender()
+                        except Exception:
+                            pass
+                        if _is_bot_message(sender, msg):
+                            continue
                         if msg.text and any(k in msg.text for k in ["สรุปออเดอร์", "ปลายทาง", "โอน", "รหัสสินค้า", "เงินสด"]):
                             th_dt = msg.date.astimezone(tz_th)
                             d_str = extract_business_date(th_dt, msg.text or "")
                             time_str = th_dt.strftime("%Y-%m-%d %H:%M:%S")
+                            sender_name = (getattr(sender, "first_name", "") or getattr(sender, "title", "")) if sender else ""
                             p = parse_order_message(
                                 text=msg.text,
                                 source_channel=ch_name,
                                 sku_cost_map=sku_cost_map,
+                                sender_name=sender_name,
                                 order_date=d_str,
                                 order_time=time_str,
                                 message_id=str(msg.id)
