@@ -28,15 +28,17 @@ def save_order_to_db(order_data: Dict[str, Any], return_is_new: bool = False) ->
 
     # Check if order exists by message_id; if exists and edited, update it!
     if msg_id:
-        cur.execute("SELECT id, raw_text, total_sales, total_pieces, cod_amount, transfer_amount, order_date FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
+        cur.execute("SELECT id, raw_text, total_sales, total_pieces, cod_amount, transfer_amount, order_date, status FROM orders WHERE source_channel = ? AND message_id = ?", (channel, str(msg_id)))
         existing = cur.fetchone()
         if existing:
+            if existing["status"] == "cancelled":
+                conn.close()
+                return (existing["id"], False) if return_is_new else existing["id"]
             existing_id = existing["id"]
             raw_new = (order_data.get("raw_text") or "").strip()
             raw_old = (existing["raw_text"] or "").strip()
-            # If date, text, sales, pieces, cod, or transfer changed -> update order and replace items!
+            # Only overwrite if message text, sales, pieces, cod, or transfer actually changed (preserve manual order_date audit fixes)
             if (raw_new != raw_old or
-                order_date != existing["order_date"] or
                 abs(order_data.get("total_sales", 0.0) - (existing["total_sales"] or 0.0)) > 0.01 or
                 order_data.get("total_pieces", 1) != existing["total_pieces"] or
                 abs(order_data.get("cod_amount", 0.0) - (existing["cod_amount"] or 0.0)) > 0.01 or
