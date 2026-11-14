@@ -414,8 +414,10 @@ def parse_structured_storefront_order(text: str, sku_cost_map: Dict[str, float],
     if not sku_line:
         return None
 
-    raw_skus = [s.strip() for s in re.split(r'[/+]\s*|-(?=(?:AR|XRP|JA|[A-Za-z]{2,})\d+)|,\s*(?=(?:AR|XRP|[A-Za-z]{2,})\d+)', sku_line, flags=re.IGNORECASE) if s.strip()]
+    raw_skus = [s.strip() for s in re.split(r'[/+]\s*|-(?=(?:AR|XRP|JA|[A-Za-z]{2,})\d+)|,\s*(?=(?:AR|XRP|[A-Za-z]{2,})\d+)|(?<=\))(?=(?:AR|XRP|JA|[A-Za-z]{2,})\d+)', sku_line, flags=re.IGNORECASE) if s.strip()]
     raw_sizes = [s.strip() for s in re.split(r'[/,]\s*', sz_line) if s.strip()]
+    if len(raw_skus) == 1 and len(raw_sizes) > 1:
+        raw_skus = raw_skus * len(raw_sizes)
 
     items = []
     for idx, s in enumerate(raw_skus):
@@ -495,8 +497,11 @@ def parse_order_message(
     if any(k in text for k in ["ตัวอย่าง", "เปลี่ยนไซต์", "เปลี่ยนไซส์", "แก้สต๊อก", "แก้ไขในสต๊อก", "แก้ไขสต็อก", "แจ้งเปลี่ยน"]):
         return None
 
-    # 1. Check if structured staff storefront order format (for KKC, Korat, UDN, or storefront text)
-    if source_channel in ["kkc", "korat", "udn"] or ("ลูกค้า" in text and ("รหัสสินค้า" in text or "หน้าร้าน" in text)):
+    # STRICT FILTER: Only parse orders from the official order formats!
+    # 1. Storefront channels (KKC, Korat, UDN) MUST contain 'รหัสสินค้า'
+    if source_channel in ["kkc", "korat", "udn"]:
+        if "รหัสสินค้า" not in text:
+            return None
         structured = parse_structured_storefront_order(text, sku_cost_map, order_date)
         if structured:
             structured["message_id"] = message_id
@@ -507,7 +512,12 @@ def parse_order_message(
             if order_time:
                 structured["order_time"] = order_time
             return structured
+        return None
 
+    # 2. Online channel MUST contain 'สรุปออเดอร์' or 'ปลายทาง'
+    if source_channel == "online":
+        if not any(k in text for k in ["สรุปออเดอร์", "ปลายทาง", "ยอดโอน", "เงินโอน"]):
+            return None
 
     items = parse_order_items(text, sku_cost_map)
     if not items:
