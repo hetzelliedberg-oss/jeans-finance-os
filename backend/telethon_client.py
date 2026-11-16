@@ -309,8 +309,8 @@ class TelethonManager:
                     msg_id = str(msg.id)
 
                     raw_numbered = re.split(r"(?:^|\n)\s*\d+\.\s*\n", text)
-                    if len(raw_numbered) > 1 and any("ลูกค้า" in b or "รหัส" in b or "สรุปออเดอร์" in b for b in raw_numbered):
-                        blocks = [b.strip() for b in raw_numbered if b.strip()]
+                    blocks = [b.strip() for b in raw_numbered if b.strip()]
+                    if len(blocks) > 1 and sum(1 for b in blocks if ("ลูกค้า" in b or "รหัส" in b or "สรุปออเดอร์" in b)) > 1:
                         for b_idx, block_text in enumerate(blocks):
                             sub_msg_id = f"{msg_id}_{b_idx+1}"
                             live_msg_ids.add(sub_msg_id)
@@ -450,6 +450,7 @@ class TelethonManager:
             try:
                 await self._ensure_client()
                 if await self.client.is_user_authorized():
+                    self.is_connected = True
                     self._register_listener()
                     print("[Telethon] ✅ Live listener registered (NewMessage, Edit, and Delete)", flush=True)
                     # Run immediate initial audit on boot
@@ -457,8 +458,10 @@ class TelethonManager:
                     # Start continuous 30-second audit loop
                     asyncio.create_task(self._auto_sync_loop())
                 else:
+                    self.is_connected = False
                     print("[Telethon] ⚠ Client connected but not authorized. Pending login.", flush=True)
             except Exception as e:
+                self.is_connected = False
                 print(f"[Telethon] ⚠ Error during daemon start: {e}", flush=True)
 
         asyncio.run_coroutine_threadsafe(_init_and_start(), self.loop)
@@ -503,11 +506,13 @@ class TelethonManager:
                                 live_msg_ids.add(str(msg.id))
                                 save_order_to_db(p)
                                 
-                    # Clean up deleted messages for today
+                    # Clean up deleted messages for today (and stray Bot API group-local IDs < 50000 for online)
                     if live_msg_ids:
                         conn = get_db_connection()
                         cur = conn.cursor()
-                        today_str = datetime.now(tz_th).strftime("%Y-%m-%d")
+                        now_th = datetime.now(tz_th)
+                        today_str = now_th.strftime("%Y-%m-%d")
+                        yesterday_str = (now_th - timedelta(days=1)).strftime("%Y-%m-%d")
                         cur.execute(
                             "SELECT id, message_id FROM orders WHERE source_channel = ? AND order_date = ?",
                             (ch_name, today_str)
@@ -517,6 +522,17 @@ class TelethonManager:
                             if m_id and m_id not in live_msg_ids:
                                 cur.execute("DELETE FROM order_items WHERE order_id = ?", (r["id"],))
                                 cur.execute("DELETE FROM orders WHERE id = ?", (r["id"],))
+                        if ch_name == "online":
+                            cur.execute(
+                                "SELECT id, message_id FROM orders WHERE source_channel = 'online' AND order_date IN (?, ?)",
+                                (yesterday_str, today_str)
+                            )
+                            for r in cur.fetchall():
+                                m_id = str(r["message_id"]) if r["message_id"] else ""
+                                head = m_id.split("_")[0]
+                                if head.isdigit() and int(head) < 50000:
+                                    cur.execute("DELETE FROM order_items WHERE order_id = ?", (r["id"],))
+                                    cur.execute("DELETE FROM orders WHERE id = ?", (r["id"],))
                         conn.commit()
                         conn.close()
                 except Exception as ex_ch:

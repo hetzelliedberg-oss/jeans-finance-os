@@ -4,7 +4,7 @@ import time
 import threading
 import requests
 import json
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any
 from backend.database import get_settings, get_sku_cost_map
 from backend.parser import parse_order_message, extract_business_date
@@ -82,7 +82,8 @@ class TelegramBotWorker:
                     sender = msg.get("from", {}).get("first_name", "") or msg.get("sender_chat", {}).get("title", "")
                     msg_id = str(msg.get("message_id", ""))
                     date_ts = msg.get("date", int(time.time()))
-                    dt = datetime.fromtimestamp(date_ts)
+                    tz_th = timezone(timedelta(hours=7))
+                    dt = datetime.fromtimestamp(date_ts, tz=tz_th).replace(tzinfo=None)
                     order_date = extract_business_date(dt, text, msg_id)
                     order_time = dt.strftime("%Y-%m-%d %H:%M:%S")
 
@@ -159,10 +160,19 @@ class TelegramBotWorker:
 
                     print(f"[Telegram Bot] New message received: id={msg_id}, sender='{sender}', chat='{chat_title}' ({chat_id}), channel={channel}", flush=True)
 
+                    # Skip saving if Telethon live listener is connected & authorized (prevents UTC/local-ID duplicates)
+                    try:
+                        from backend.telethon_client import telethon_manager
+                        if telethon_manager.is_connected and telethon_manager.client and telethon_manager.client.is_connected():
+                            print(f"[Telegram Bot] Skipping DB save for id={msg_id} (Telethon active)", flush=True)
+                            continue
+                    except Exception:
+                        pass
+
                     # Check if the message contains multiple numbered order blocks (e.g. 1. \n ลูกค้า : ... \n 2. \n ลูกค้า : ...)
                     raw_numbered = re.split(r"(?:^|\n)\s*\d+\.\s*\n", text)
-                    if len(raw_numbered) > 1 and any("ลูกค้า" in b or "รหัส" in b for b in raw_numbered):
-                        blocks = [b.strip() for b in raw_numbered if b.strip()]
+                    blocks = [b.strip() for b in raw_numbered if b.strip()]
+                    if len(blocks) > 1 and sum(1 for b in blocks if ("ลูกค้า" in b or "รหัส" in b)) > 1:
                         for b_idx, block_text in enumerate(blocks):
                             sub_msg_id = f"{msg_id}_{b_idx+1}"
                             parsed = parse_order_message(
