@@ -280,14 +280,19 @@ class TelethonManager:
                 scanned_count = 0
                 imported_orders = 0
                 live_msg_ids = set()
+                scan_limit = 400
+                reached_since_dt = False
+                oldest_scanned_date = None
 
-                async for msg in self.client.iter_messages(chat_id, limit=400):
+                async for msg in self.client.iter_messages(chat_id, limit=scan_limit):
                     tz_th = timezone(timedelta(hours=7))
                     dt_th = msg.date.astimezone(tz_th)
                     if dt_th.replace(tzinfo=None) < since_dt:
+                        reached_since_dt = True
                         break
 
                     scanned_count += 1
+                    oldest_scanned_date = dt_th.strftime("%Y-%m-%d")
                     text = msg.text or msg.message or ""
                     if not text.strip():
                         continue
@@ -343,15 +348,33 @@ class TelethonManager:
                             if oid:
                                 imported_orders += 1
 
-                # Clean up deleted messages (orders in DB within date range that no longer exist in Telegram)
+                # Clean up deleted messages ONLY inside the date window we completely scanned
+                # (Never delete historical orders older than the scan_limit cutoff!)
                 deleted_orders = 0
-                if live_msg_ids:
+                if live_msg_ids and (reached_since_dt or scanned_count < scan_limit):
                     conn = get_db_connection()
                     cur = conn.cursor()
                     since_date_str = since_dt.strftime("%Y-%m-%d")
                     cur.execute(
                         "SELECT id, message_id FROM orders WHERE source_channel = ? AND order_date >= ?",
                         (channel, since_date_str)
+                    )
+                    db_rows = cur.fetchall()
+                    for r in db_rows:
+                        m_id = str(r["message_id"]) if r["message_id"] else ""
+                        if m_id and m_id not in live_msg_ids:
+                            cur.execute("DELETE FROM order_items WHERE order_id = ?", (r["id"],))
+                            cur.execute("DELETE FROM orders WHERE id = ?", (r["id"],))
+                            deleted_orders += 1
+                    conn.commit()
+                    conn.close()
+                elif live_msg_ids and oldest_scanned_date:
+                    # Partial scan (hit scan_limit): only clean up orders strictly AFTER oldest_scanned_date
+                    conn = get_db_connection()
+                    cur = conn.cursor()
+                    cur.execute(
+                        "SELECT id, message_id FROM orders WHERE source_channel = ? AND order_date > ?",
+                        (channel, oldest_scanned_date)
                     )
                     db_rows = cur.fetchall()
                     for r in db_rows:
