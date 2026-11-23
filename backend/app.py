@@ -808,6 +808,73 @@ def ai_chat_endpoint(req: AiChatRequest):
     return execute_chat_query(req.prompt, model_name=req.model)
 
 
+# ---------------- MOUNT UNIFIED AI CHATBOT + ADS MONITOR (/chatbot + /webhook) ---------------- #
+_chatbot_dir = os.path.join(BASE_DIR, "chatbot_module")
+if os.path.isdir(_chatbot_dir):
+    import asyncio as _asyncio
+    from fastapi import Request as _Request
+
+    # Hydrate shared env vars from Finance OS SQLite settings if not already set in os.environ
+    try:
+        _fin_settings = get_settings()
+        for _k in [
+            "FB_ACCESS_TOKEN", "AD_ACCOUNT_ID", "TELEGRAM_BOT_TOKEN",
+            "TELEGRAM_ONLINE_CHAT_ID", "TELEGRAM_KKC_CHAT_ID",
+            "TELEGRAM_KORAT_CHAT_ID", "TELEGRAM_UDN_CHAT_ID",
+        ]:
+            if not os.environ.get(_k) and _fin_settings.get(_k):
+                os.environ[_k] = str(_fin_settings[_k])
+    except Exception as _e:
+        print(f"[Unified] Env hydrate warning: {_e}", flush=True)
+
+    if _chatbot_dir not in sys.path:
+        sys.path.insert(0, _chatbot_dir)
+
+    try:
+        import importlib.util as _ilu
+        _spec = _ilu.spec_from_file_location("chatbot_app_mod", os.path.join(_chatbot_dir, "app.py"))
+        _cb_mod = _ilu.module_from_spec(_spec)
+        _spec.loader.exec_module(_cb_mod)
+
+        app.mount("/chatbot", _cb_mod.app)
+
+        # Expose Facebook Webhook directly at root /webhook (GET verify + POST events)
+        @app.get("/webhook")
+        async def _root_webhook_get(request: _Request):
+            return await _cb_mod.verify_webhook(
+                hub_mode=request.query_params.get("hub.mode"),
+                hub_verify_token=request.query_params.get("hub.verify_token"),
+                hub_challenge=request.query_params.get("hub.challenge"),
+            )
+
+        @app.post("/webhook")
+        async def _root_webhook_post(request: _Request):
+            return await _cb_mod.receive_webhook(request)
+
+        _cb_bg_tasks = []
+
+        @app.on_event("startup")
+        async def _start_chatbot_workers():
+            _cb_mod.init_db()
+            _cb_mod.meta_client.reload_env()
+            for _fn in [
+                _cb_mod.poller_loop,
+                _cb_mod.followup_loop,
+                _cb_mod.learner_loop,
+                _cb_mod.self_grill_loop,
+                _cb_mod.ads_monitor_loop,
+            ]:
+                _cb_bg_tasks.append(_asyncio.create_task(_fn()))
+            print("[Unified] ✅ AI Chatbot + Ads Monitor + Telegram Notify started at /chatbot & /webhook", flush=True)
+
+        @app.on_event("shutdown")
+        async def _stop_chatbot_workers():
+            for _t in _cb_bg_tasks:
+                _t.cancel()
+    except Exception as _cb_err:
+        print(f"[Unified] ⚠ Chatbot mount skipped: {_cb_err}", flush=True)
+
+
 # ---------------- SERVE STATIC FRONTEND ---------------- #
 frontend_dir = os.path.join(BASE_DIR, "frontend")
 if os.path.exists(frontend_dir):

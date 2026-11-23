@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jeans Around — 24/7 Cloud AI Sales Chatbot (3-Enter + Grill)</title>
+  <style>
+    :root {
+      --bg: #0b0f19; --card: #131a2a; --border: #232d45;
+      --text: #e2e8f0; --muted: #94a3b8; --accent: #38bdf8;
+      --green: #22c55e; --red: #ef4444; --amber: #f59e0b;
+    }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: 20px; }
+    .container { max-width: 1280px; margin: 0 auto; }
+    .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; }
+    h1 { margin: 0; font-size: 1.4rem; }
+    .badge { padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; background: #1e293b; color: var(--accent); }
+    .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge.warn { background: rgba(245,158,11,0.15); color: var(--amber); }
+    .badge.err { background: rgba(239,68,68,0.15); color: var(--red); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+    .stat-num { font-size: 1.6rem; font-weight: 700; margin-top: 6px; }
+    .stat-lbl { color: var(--muted); font-size: 0.85rem; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    button { background: var(--accent); color: #0b0f19; border: none; padding: 9px 14px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    button.secondary { background: #1e293b; color: var(--text); border: 1px solid var(--border); }
+    button.danger { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid var(--red); }
+    input, textarea, select { width: 100%; background: #0f1524; color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 4px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .tab { padding: 8px 14px; border-radius: 8px; cursor: pointer; background: var(--card); border: 1px solid var(--border); color: var(--muted); }
+    .tab.active { background: var(--accent); color: #0b0f19; font-weight: 700; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .bubble { background: #1e293b; border-left: 3px solid var(--accent); padding: 8px 10px; border-radius: 6px; margin-top: 6px; font-size: 0.88rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div>
+        <h1>Jeans Around — 24/7 Cloud AI Chatbot</h1>
+        <div style="color: var(--muted); font-size: 0.85rem; margin-top: 4px;">
+          Page ID: <span id="pageId">-</span> | Ad Account: <span id="adAcc">-</span> |
+          <span id="fbBadge" class="badge">Checking...</span>
+          <span id="geminiBadge" class="badge">Checking...</span>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="btnAutoPilot" onclick="toggleAutoPilot()">Auto-Pilot: OFF</button>
+        <button id="btnDryRun" class="secondary" onclick="toggleDryRun()">Dry-Run: ON</button>
+        <button class="secondary" onclick="learnNow()">เรียนรู้จากแชทเพจ & Ads ตอนนี้</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card"><div class="stat-lbl">แชททั้งหมดที่เรียนรู้</div><div class="stat-num" id="stTotal">0</div></div>
+      <div class="card"><div class="stat-lbl">รอติดตาม / ตอบช้า</div><div class="stat-num" id="stWaiting">0</div></div>
+      <div class="card"><div class="stat-lbl">Blacklist (กันลูกค้าด่า)</div><div class="stat-num" id="stBlacklisted">0</div></div>
+      <div class="card"><div class="stat-lbl">ปิดการขาย / Handoff</div><div class="stat-num" id="stWon">0</div></div>
+      <div class="card"><div class="stat-lbl">Ads & Patterns ที่เรียนรู้</div><div class="stat-num" id="stLearned">0</div></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card">
+        <h3 style="margin-top:0;">ทดลองจำลองแชท (3-Enter + Grill Simulator)</h3>
+        <label style="font-size:0.82rem;color:var(--muted)">ชื่อลูกค้า</label>
+        <input id="simName" value="คุณแอน" />
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-top:8px;">ชื่อ Ad / แคมเปญ (ถ้ามี)</label>
+        <input id="simAd" placeholder="เช่น ขอนแก่น รีวิวลค มาจาก (โปรเคลียร์ 2XL-4XL)" />
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-top:8px;">ข้อความล่าสุดของลูกค้า</label>
+        <textarea id="simMsg" rows="2">ราคาตัวเท่าไหร่คะ</textarea>
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-top:8px;">แอดมินเคยทักอะไรไปแล้วบ้าง (ทดสอบกันทวนซ้ำ)</label>
+        <input id="simPrior" placeholder="เช่น ขอชื่อที่อยู่เบอร์โทรเลยค่ะ" />
+        <div style="display:flex;gap:10px;align-items:center;margin-top:10px;">
+          <label style="font-size:0.85rem;"><input type="checkbox" id="simFollowup" style="width:auto;" /> โหมดลูกค้าตอบช้า (Follow-up)</label>
+          <button onclick="runSim()">ทดสอบ Grill & 3-Enter</button>
+        </div>
+        <div id="simOut" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">ตั้งค่าระบบ Cloud 24/7</h3>
+        <label style="font-size:0.82rem;color:var(--muted)">Gemini API Key (ใส่เพื่อเปิดสมอง AI เต็มรูปแบบ)</label>
+        <input id="cfgGeminiKey" type="password" placeholder="AIza..." />
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-top:8px;">จังหวะทักซ้ำเมื่อลูกค้าตอบช้า (นาที, คั่นด้วยจุลภาค)</label>
+        <input id="cfgDelays" value="30,240,1200" />
+        <label style="font-size:0.82rem;color:var(--muted);display:block;margin-top:8px;">รอบ Polling (วินาที)</label>
+        <input id="cfgPoll" type="number" value="25" />
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px;">
+          <div><label style="font-size:0.75rem;color:var(--muted)">TG ID มิว (Mew)</label><input id="cfgMew" placeholder="เช่น 123456789" /></div>
+          <div><label style="font-size:0.75rem;color:var(--muted)">TG ID แอม (Am)</label><input id="cfgAm" placeholder="เช่น 123456789" /></div>
+          <div><label style="font-size:0.75rem;color:var(--muted)">TG ID กีฟ (Gift)</label><input id="cfgGift" placeholder="เช่น 123456789" /></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button onclick="saveConfig()">บันทึกการตั้งค่า</button>
+          <button class="secondary" onclick="discoverAdmins()">ตรวจหา ID แอดมินที่ทักบอท</button>
+        </div>
+        <div id="cfgMsg" style="font-size:0.82rem;color:var(--green);margin-top:6px;"></div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('logs', this)">Grill Audit Logs</div>
+      <div class="tab" onclick="showTab('convs', this)">รายการแชทลูกค้า</div>
+      <div class="tab" onclick="showTab('orders', this)">ออเดอร์ที่ปิดได้ (Telegram Billing)</div>
+      <div class="tab" onclick="showTab('ads', this)">บริบท Ads & Patterns ที่เรียนรู้</div>
+    </div>
+
+    <div id="tab-logs" class="card">
+      <table>
+        <thead><tr><th>เวลา</th><th>ลูกค้า</th><th>ประเภท</th><th>ผล Grill</th><th>เหตุผล / ข้อความ 3-Enter</th></tr></thead>
+        <tbody id="logsBody"></tbody>
+      </table>
+    </div>
+
+    <div id="tab-convs" class="card hidden">
+      <table>
+        <thead><tr><th>ลูกค้า</th><th>สาขา</th><th>สถานะ</th><th>Follow-up</th><th>จัดการ</th></tr></thead>
+        <tbody id="convsBody"></tbody>
+      </table>
+      <div id="chatDrawer" class="card hidden" style="margin-top:12px;background:#0f1524;">
+        <h4 id="chatTitle" style="margin:0 0 8px 0;">ประวัติแชท</h4>
+        <div id="chatMsgs"></div>
+      </div>
+    </div>
+
+    <div id="tab-orders" class="card hidden">
+      <table>
+        <thead><tr><th>เวลา</th><th>สาขา</th><th>ลูกค้า / เบอร์</th><th>สินค้า & ยอด</th><th>รูปแบบ Telegram Summary</th></tr></thead>
+        <tbody id="ordersBody"></tbody>
+      </table>
+    </div>
+
+    <div id="tab-ads" class="card hidden">
+      <table>
+        <thead><tr><th>สาขา</th><th>ชื่อ Ad / Topic</th><th>รายละเอียด / ตัวอย่างคำตอบที่เรียนรู้</th></tr></thead>
+        <tbody id="adsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let currentState = {};
+    async function refresh() {
+      const s = await fetch('/chatbot/api/status').then(r => r.json());
+      currentState = s;
+      document.getElementById('pageId').textContent = s.page_id;
+      document.getElementById('adAcc').textContent = s.ad_account_id;
+      document.getElementById('fbBadge').textContent = s.has_fb_token ? 'FB Connected' : 'No FB Token';
+      document.getElementById('fbBadge').className = 'badge ' + (s.has_fb_token ? 'ok' : 'err');
+      document.getElementById('geminiBadge').textContent = s.has_gemini_key ? 'Gemini AI Active' : 'Hybrid Script Mode';
+      document.getElementById('geminiBadge').className = 'badge ' + (s.has_gemini_key ? 'ok' : 'warn');
+
+      const btnAuto = document.getElementById('btnAutoPilot');
+      btnAuto.textContent = 'Auto-Pilot: ' + (s.auto_pilot_enabled ? 'ON (24/7)' : 'OFF');
+      btnAuto.style.background = s.auto_pilot_enabled ? 'var(--green)' : '#64748b';
+
+      const btnDry = document.getElementById('btnDryRun');
+      btnDry.textContent = 'Dry-Run: ' + (s.dry_run_mode ? 'ON (ทดสอบไม่ส่งจริง)' : 'OFF (ส่งจริง!)');
+
+      document.getElementById('stTotal').textContent = s.stats.total_conversations;
+      document.getElementById('stWaiting').textContent = s.stats.waiting_reply;
+      document.getElementById('stBlacklisted').textContent = s.stats.blacklisted;
+      document.getElementById('stWon').textContent = s.stats.won_orders;
+      document.getElementById('stLearned').textContent = s.stats.ads_learned + ' / ' + s.stats.patterns_learned;
+
+      document.getElementById('cfgDelays').value = s.settings.followup_delays_min || '5,10,20,30,60,120,180,240';
+      document.getElementById('cfgPoll').value = s.settings.poll_interval_sec || '25';
+      document.getElementById('cfgMew').value = s.settings.TELEGRAM_ADMIN_MEW_ID || '';
+      document.getElementById('cfgAm').value = s.settings.TELEGRAM_ADMIN_AM_ID || '';
+      document.getElementById('cfgGift').value = s.settings.TELEGRAM_ADMIN_GIFT_ID || '';
+
+      const logs = await fetch('/chatbot/api/grill-logs').then(r => r.json());
+      document.getElementById('logsBody').innerHTML = logs.logs.map(l => `
+        <tr>
+          <td>${(l.created_at || '').slice(11, 19)}</td>
+          <td><b>${l.customer_name || l.psid}</b></td>
+          <td>${l.trigger_type}</td>
+          <td><span class="badge ${l.decision==='SEND'?'ok':l.decision==='BLOCK'?'err':'warn'}">${l.decision}</span></td>
+          <td><div>${l.reason || ''}</div>${(l.bubbles||[]).map((b,i)=>`<div class="bubble"><b>Enter ${i+1}:</b> ${b}</div>`).join('')}</td>
+        </tr>
+      `).join('');
+
+      const convs = await fetch('/chatbot/api/conversations').then(r => r.json());
+      document.getElementById('convsBody').innerHTML = convs.conversations.map(c => `
+        <tr>
+          <td><a href="#" style="color:var(--accent);text-decoration:none;font-weight:700" onclick="viewChat('${c.psid}','${(c.customer_name||'').replace(/'/g,'')}');return false;">${c.customer_name}</a><br/><span style="color:var(--muted);font-size:0.75rem">${c.psid}</span></td>
+          <td>${c.branch}</td>
+          <td><span class="badge ${c.status==='BLACKLISTED'?'err':c.status==='WON'?'ok':'warn'}">${c.status}</span></td>
+          <td>Stage ${c.followup_stage || 0}</td>
+          <td><button class="secondary" onclick="toggleBlacklist('${c.psid}', ${c.status !== 'BLACKLISTED'})">${c.status==='BLACKLISTED'?'ปลดล็อก':'Mute/Blacklist'}</button></td>
+        </tr>
+      `).join('');
+
+      const orders = await fetch('/chatbot/api/orders').then(r => r.json());
+      document.getElementById('ordersBody').innerHTML = (orders.orders || []).map(o => `
+        <tr>
+          <td>${(o.created_at || '').slice(0, 16).replace('T', ' ')}</td>
+          <td>${o.branch}</td>
+          <td><b>${o.recipient_name}</b><br/><span style="color:var(--muted)">${o.phone}</span></td>
+          <td>${o.items}<br/><b>${o.amount}฿ (${o.payment_method})</b></td>
+          <td><pre style="margin:0;white-space:pre-wrap;font-size:0.78rem;background:#0f1524;padding:8px;border-radius:6px;">${o.raw_summary}</pre></td>
+        </tr>
+      `).join('');
+
+      const kb = await fetch('/chatbot/api/ad-knowledge').then(r => r.json());
+      const rows = [
+        ...kb.ads.slice(0, 15).map(a => `<tr><td>${a.branch}</td><td><b>[Ad]</b> ${a.ad_name}</td><td>${a.creative_summary}</td></tr>`),
+        ...kb.patterns.slice(0, 20).map(p => `<tr><td>${p.branch}</td><td><b>[${p.topic}]</b> ${p.customer_intent} (x${p.win_count})</td><td>ลูกค้า: "${p.customer_example}"<br/>แอดมิน: "${p.admin_reply_example}"</td></tr>`)
+      ];
+      document.getElementById('adsBody').innerHTML = rows.join('');
+    }
+
+    async function toggleAutoPilot() {
+      await fetch('/chatbot/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ auto_pilot_enabled: !currentState.auto_pilot_enabled }) });
+      refresh();
+    }
+    async function toggleDryRun() {
+      await fetch('/chatbot/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ dry_run_mode: !currentState.dry_run_mode }) });
+      refresh();
+    }
+    async function learnNow() {
+      const r = await fetch('/chatbot/api/learn-now', { method: 'POST' }).then(x => x.json());
+      alert('เรียนรู้สำเร็จ! Ads: ' + r.result.ads_synced + ', แชท: ' + r.result.conversations_scanned + ', Patterns ใหม่: ' + r.result.patterns_learned);
+      refresh();
+    }
+    async function saveConfig() {
+      const payload = {
+        followup_delays_min: document.getElementById('cfgDelays').value,
+        poll_interval_sec: parseInt(document.getElementById('cfgPoll').value || '25', 10),
+        TELEGRAM_ADMIN_MEW_ID: document.getElementById('cfgMew').value.trim(),
+        TELEGRAM_ADMIN_AM_ID: document.getElementById('cfgAm').value.trim(),
+        TELEGRAM_ADMIN_GIFT_ID: document.getElementById('cfgGift').value.trim()
+      };
+      const k = document.getElementById('cfgGeminiKey').value.trim();
+      if (k) payload.GEMINI_API_KEY = k;
+      await fetch('/chatbot/api/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      document.getElementById('cfgMsg').textContent = 'บันทึกเรียบร้อย!';
+      refresh();
+    }
+    async function discoverAdmins() {
+      const res = await fetch('/chatbot/api/telegram/discover-admins').then(r => r.json());
+      if (!res.users || !res.users.length) {
+        alert('ยังไม่พบแอดมินทักบอทเข้ามาครับ ให้ มิว/แอม/กีฟ กด /start ที่บอท Telegram ก่อนแล้วกดปุ่มนี้อีกครั้ง');
+        return;
+      }
+      alert('พบผู้ใช้ที่ทักบอท:\n' + res.users.map(u => `${u.name} (@${u.username}): ${u.id}`).join('\n'));
+    }
+    async function toggleBlacklist(psid, val) {
+      await fetch(`/api/conversations/${psid}/blacklist?blacklist=${val}`, { method: 'POST' });
+      refresh();
+    }
+    async function runSim() {
+      const res = await fetch('/chatbot/api/simulate', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          customer_name: document.getElementById('simName').value,
+          ad_name: document.getElementById('simAd').value,
+          customer_message: document.getElementById('simMsg').value,
+          prior_admin_message: document.getElementById('simPrior').value,
+          is_followup: document.getElementById('simFollowup').checked,
+          followup_stage: document.getElementById('simFollowup').checked ? 1 : 0
+        })
+      }).then(r => r.json());
+      const g = res.grill;
+      let html = `<div class="badge ${g.decision==='SEND'?'ok':'err'}">Grill: ${g.decision} (${g.branch} / ${g.intent})</div><div style="font-size:0.82rem;color:var(--muted);margin-top:4px;">${g.reason}</div>`;
+      if (res.bubbles && res.bubbles.length) {
+        html += res.bubbles.map((b, i) => `<div class="bubble"><b>Enter ${i+1}:</b> ${b}</div>`).join('');
+      }
+      document.getElementById('simOut').innerHTML = html;
+    }
+    async function viewChat(psid, name) {
+      const data = await fetch(`/api/conversations/${psid}/messages`).then(r => r.json());
+      document.getElementById('chatDrawer').classList.remove('hidden');
+      document.getElementById('chatTitle').textContent = `ประวัติแชท: ${name} (${psid})`;
+      document.getElementById('chatMsgs').innerHTML = (data.messages || []).map(m => `
+        <div class="bubble" style="border-left-color:${m.sender_role==='customer'?'#f59e0b':'#22c55e'}">
+          <b>${m.sender_role === 'customer' ? 'ลูกค้า' : m.sender_role === 'bot' ? 'AI Bot' : 'แอดมิน'}:</b> ${m.text || '(ไฟล์แนบ/รูปภาพ)'}
+        </div>
+      `).join('');
+    }
+    function showTab(name, el) {
+      ['logs', 'convs', 'orders', 'ads'].forEach(t => document.getElementById('tab-' + t).classList.toggle('hidden', t !== name));
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      el.classList.add('active');
+    }
+    refresh();
+    setInterval(refresh, 15000);
+  </script>
+</body>
+</html>
