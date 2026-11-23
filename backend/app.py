@@ -57,19 +57,19 @@ telethon_manager.start()
 # ─── PRODUCTION KEEPALIVE + AUTO DB BACKUP ───────────────────────────────────
 import threading, time, base64, requests as _req
 
-RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8055")
+_space_host = os.environ.get("SPACE_HOST", "")
+RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL") or (f"https://{_space_host}" if _space_host else "http://localhost:8055")
 GH_TOKEN   = os.environ.get("GH_TOKEN", "")
 GH_REPO    = os.environ.get("GH_REPO", "hetzelliedberg-oss/jeans-finance-os")
 DB_PATH    = os.path.join(BASE_DIR, "data", "finance_hub.db")
 
 def _keepalive_loop():
-    """Ping own /api/health every 10 min → Render free tier stays awake 24/7"""
+    """Ping own /api/health every 10 min → Free cloud stays awake 24/7 (single service <= 744h/mo < 750h limit)"""
     time.sleep(30)
     print(f"[Keepalive] Started → pinging {RENDER_URL} every 10 min", flush=True)
     while True:
         try:
             _req.get(f"{RENDER_URL}/api/health", timeout=15)
-            _req.get("https://jeans-around-ai-chatbot.onrender.com/api/health", timeout=15)
             print(f"[Keepalive] ✅ {datetime.now().strftime('%H:%M')}", flush=True)
         except Exception as e:
             print(f"[Keepalive] ⚠ {e}", flush=True)
