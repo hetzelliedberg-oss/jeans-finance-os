@@ -585,6 +585,45 @@ def _build_fallback_3enter(
             "รับโอนหรือปลายทางดีคะ",
         ]
 
+    # -1g. Direct ready-to-buy order with explicit size(s) + buy/payment intent (e.g. "เอา 2 ตัว ไซส์ L กับ XL เก็บปลายทาง")
+    _picked_sizes = re.findall(r"(?<![A-Za-z0-9])(4XL|3XL|2XL|XL|L|M)(?![A-Za-z0-9])", last_cust.upper())
+    _picked_sizes_uniq = list(dict.fromkeys(_picked_sizes))
+    _has_buy_verb = bool(re.search(r"(เอา|รับ|สั่ง|จัด)", last_cust))
+    _has_pay_in_last = bool(re.search(r"(ปลายทาง|cod|โอน)", last_cust, re.I))
+    _has_multi_qty = bool(re.search(r"(2\s*ตัว|สองตัว|3\s*ตัว|คู่)", last_cust)) or len(_picked_sizes_uniq) >= 2
+    if not is_followup and _picked_sizes_uniq and _has_buy_verb and (_has_pay_in_last or _has_multi_qty):
+        sz_str = ", ".join(_picked_sizes_uniq)
+        pay_str = "เก็บปลายทาง" if re.search(r"(ปลายทาง|cod)", last_cust, re.I) else ("โอน" if "โอน" in last_cust else "")
+        qty_str = "2 ตัว " if _has_multi_qty else ""
+        e1 = f"ได้เลยค่ะ{call_name} รับ{qty_str}ไซส์ {sz_str}{' ' + pay_str if pay_str else ''}นะคะ"
+        e2 = (
+            "โปรคู่ 2 ตัว 2,400 บาท ส่งฟรี EMS ไม่บวกเพิ่มค่ะ"
+            if (_has_multi_qty and allow_2400)
+            else f"ราคาตัวละ {price_label} ส่งฟรี EMS ไม่บวกเพิ่มค่ะ"
+        )
+        e3 = (
+            "ส่งชื่อ-ที่อยู่-เบอร์โทรมาได้เลย เดี๋ยวเปิดบิลแพ็กส่งให้เลยค่า"
+            if pay_str
+            else "ส่งชื่อ-ที่อยู่-เบอร์โทรมาได้เลย รับโอนหรือปลายทางดีคะ"
+        )
+        return [e1, e2, e3]
+
+    # -1h. Asking if 2-piece promo allows mixing styles/sizes/colors
+    if not is_followup and re.search(r"(คละแบบ|คละไซส์|คละไซด์|คละรุ่น|คละลาย|คละสี)", last_cust):
+        return [
+            f"คละแบบ คละลาย คละไซส์ได้เลยค่ะ{call_name}",
+            "จับคู่ 2 ตัวเหลือ 2,400 บาท ส่งฟรี EMS (ประหยัด 180 บาท) ค่ะ",
+            "รับไซส์ไหนบ้างแจ้งหนู หรือส่งชื่อ-ที่อยู่มาได้เลยค่า",
+        ]
+
+    # -1i. Asking about other colors / shades
+    if not is_followup and re.search(r"(มีสีอื่น|กี่สี|มีสีอะไร|สีเข้มกว่า|สีอ่อนกว่า|สีอะไรบ้าง)", last_cust):
+        return [
+            f"{call_name}คะ ที่ร้านมีโทนยีนส์อ่อน ยีนส์กลาง และยีนส์เข้มให้เลือกเลยค่ะ",
+            "งานปักแต่ละสีสวยคนละฟีล ผ้ายืดนิ่มใส่สบายทุกสีเลยค่ะ",
+            "พี่ชอบโทนสีอ่อนหรือสีเข้มดีคะ ปกติใส่เอวเท่าไหร่เอ่ย",
+        ]
+
     # 0. Multi-fact intelligent response (ONLY if not already recommended in recent bot messages, and never on COD/address/length-concern turns)
     recent_bot_joined = " ".join(already_covered.get("recent_bot_texts", []))
     already_recommended_size = "หนูแนะนำเป็นไซส์" in recent_bot_joined
@@ -824,8 +863,8 @@ def _build_fallback_3enter(
         return [e1, e2, e3]
 
     if ask_delivery_time and not is_followup:
-        e1 = f"{call_name}คะ ที่ร้านส่งด่วน EMS ทุกวันค่ะ กทม./อีสานรอประมาณ 1–2 วันถึง ต่างจังหวัดประมาณ 2–3 วันถึงค่ะ"
-        e2 = "ส่งฟรีไม่มีค่าส่งเพิ่ม และเก็บเงินปลายทางได้ไม่ต้องบวกเพิ่มด้วยนะคะ"
+        e1 = f"{call_name}คะ ที่ร้านส่งด่วน EMS ทุกวัน รอ 1–2 วันถึงค่ะ"
+        e2 = "ส่งฟรีไม่มีค่าส่งเพิ่ม เก็บเงินปลายทางก็ไม่บวกเพิ่มค่ะ"
         e3 = _close_e3(f"รับกี่ตัวดีคะ{call_name} เอวเท่าไหร่ เอาโอนหรือปลายทางส่งที่อยู่มาได้เลยค่า")
         return [e1, e2, e3]
 
@@ -851,12 +890,12 @@ def _build_fallback_3enter(
         return [e1, e2, e3]
 
     if pain_price:
-        e1 = f"เข้าใจเลยค่ะ{call_name} รุ่นนี้เป็นงานปักฉลุละเอียดบนผ้ายีนส์ยืดนิ่ม ตัดเย็บเก็บทรงเฉพาะของร้านเรา ใส่แล้วอยู่ทรงสวยนานไม่ย้วยค่ะ"
+        e1 = f"เข้าใจเลยค่ะ{call_name} รุ่นนี้เป็นงานปักฉลุละเอียด ผ้ายีนส์ยืดนิ่มเก็บทรงสวยไม่ย้วยค่ะ"
         e2 = (
-            f"ตอนนี้ราคา {price_label} ส่งฟรี EMS "
-            + (f"หรือแวะหน้าร้าน {branch_desc} ซื้อ 1 ตัวลด 10% / 2 ตัวลด 20% นะคะ" if branch != "ONLINE" else ("และถ้าจับคู่ 2 ตัวเหลือเพียง 2,400 บาท (ตกตัวละ 1,200) คุ้มกว่ามากค่ะ" if allow_2400 else "เก็บปลายทางไม่บวกเพิ่มและเปลี่ยนไซส์ได้ค่ะ"))
+            f"ตัวละ {price_label} ส่งฟรี "
+            + (f"หรือแวะหน้าร้าน {branch_desc} 1 ตัวลด 10% / 2 ตัวลด 20% ค่ะ" if branch != "ONLINE" else ("รับคู่ 2 ตัวลดเหลือ 2,400 (ตกตัวละ 1,200) คุ้มกว่ามากค่ะ" if allow_2400 else "เก็บปลายทางไม่บวกเพิ่ม เปลี่ยนไซส์ได้ค่ะ"))
         )
-        e3 = _close_e3(f"ปกติ{call_name}ใส่เอวเท่าไหร่คะ รับแบบไหนดีคะ เดี๋ยวหนูดูตัวที่โปรคุ้มที่สุดพร้อมส่งให้เลยค่ะ?")
+        e3 = _close_e3(f"ปกติ{call_name}ใส่เอวเท่าไหร่คะ เดี๋ยวหนูดูตัวที่โปรคุ้มที่สุดให้เลยค่ะ")
         return [e1, e2, e3]
 
     if ask_size_chart:
