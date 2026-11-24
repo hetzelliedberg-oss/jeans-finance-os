@@ -1544,8 +1544,8 @@ def generate_3enter_reply(
     return _enforce_1line_human_bubbles(res)
 
 
-def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 46, max_bubbles: int = 4) -> List[str]:
-    """Keep each bubble to a crisp 1-line human-style chat message without chopping the closing question."""
+def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubbles: int = 4) -> List[str]:
+    """Keep each bubble to a crisp 1-line human-style chat message without dropping core answer or closing question."""
     cleaned = [(b or "").strip() for b in bubbles if (b or "").strip()]
     if not cleaned:
         return bubbles
@@ -1577,10 +1577,15 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 46, max_bubb
             out.append(s)
             continue
         parts = [p.strip() for p in re.sub(r"(นะคะ|นะครับ|เลยค่ะ|เลยน้า|ได้ค่ะ|ได้น้า|ค่ะ|คะ|ค่า)(?=\s|$)\s*", r"\1|||", s).split("|||") if p.strip()]
-        if len(parts) > 1 and len(parts[0]) <= max_len + 10:
+        # Merge short salutation like "พี่นุชคะ" with the actual answer so we NEVER drop the core answer!
+        if len(parts) > 1 and len(parts[0]) < 18:
+            parts = [f"{parts[0]} {parts[1]}".strip()] + parts[2:]
+        if len(parts) > 1 and len(parts[0]) <= max_len + 16:
+            out.append(parts[0])
+        elif parts and len(parts[0]) <= max_len + 16:
             out.append(parts[0])
         else:
-            out.extend(_split_clean_1line(s, max_len)[:2])
+            out.extend(_split_clean_1line(parts[0] if parts else s, max_len + 10)[:2])
     # Keep at most (max_bubbles - 1) body bubbles + ALWAYS keep the closing question at the end
     out = out[: max(1, max_bubbles - 1)]
     clean_closing = re.sub(r"\?+", "", closing).strip() if ("http" not in closing and re.search(r"[ก-๙]", closing)) else closing
@@ -1599,6 +1604,7 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 46, max_bubb
         ("ทางร้าน", "ที่ร้าน"),
         ("ขอบพระคุณ", "ขอบคุณ"),
         ("สะดวกให้หนู", "ให้หนู"),
+        ("ได้เลยได้เลย", "ได้เลย"),
     )
     final_out: List[str] = []
     for item in out:
