@@ -1460,6 +1460,26 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubb
     closing = cleaned[-1]
     body = cleaned[:-1]
     out: List[str] = []
+    def _split_clean_1line(text: str, limit: int) -> List[str]:
+        if len(text) <= limit or "http" in text or "ตาราง" in text or "\n" in text:
+            return [text]
+        # Protect parenthesized segments so we never break inside (...)
+        tokens = re.findall(r"\([^)]*\)|\S+", text)
+        if len(tokens) <= 1:
+            return [text]
+        chunks: List[str] = []
+        cur = ""
+        for tok in tokens:
+            cand = f"{cur} {tok}".strip() if cur else tok
+            if len(cand) <= limit or not cur:
+                cur = cand
+            else:
+                chunks.append(cur)
+                cur = tok
+        if cur:
+            chunks.append(cur)
+        return chunks
+
     for s in body:
         if len(s) <= max_len or "http" in s or "ตาราง" in s or "\n" in s:
             out.append(s)
@@ -1468,15 +1488,16 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubb
         if len(parts) > 1 and len(parts[0]) <= max_len + 10:
             out.append(parts[0])
         else:
-            out.append(s)
+            out.extend(_split_clean_1line(s, max_len)[:2])
     # Keep at most (max_bubbles - 1) body bubbles + ALWAYS keep the closing question at the end
     out = out[: max(1, max_bubbles - 1)]
-    if len(closing) <= max_len + 12 or "http" in closing or "ตาราง" in closing or "\n" in closing:
-        out.append(closing)
+    clean_closing = re.sub(r"\?+", "", closing).strip() if ("http" not in closing and re.search(r"[ก-๙]", closing)) else closing
+    if len(clean_closing) <= max_len + 8 or "http" in clean_closing or "ตาราง" in clean_closing or "\n" in clean_closing:
+        out.append(clean_closing)
     else:
-        clean_closing = re.sub(r"\?+", "", closing).strip()
         c_parts = [p.strip() for p in re.sub(r"(ค่ะ|นะคะ|น้า|ค่า|คะ)\s*", r"\1|||", clean_closing).split("|||") if p.strip()]
-        out.append(c_parts[-1] if c_parts else clean_closing)
+        chosen = c_parts[-1] if (c_parts and len(c_parts[-1]) >= 12) else clean_closing
+        out.extend(_split_clean_1line(chosen, max_len + 8)[:2])
     # Remove trailing '?' from Thai messages and drop any standalone '?' bubble
     final_out: List[str] = []
     for item in out:
