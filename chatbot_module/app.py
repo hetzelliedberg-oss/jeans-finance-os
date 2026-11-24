@@ -721,9 +721,9 @@ async def poller_loop() -> None:
                 cust_dt = parse_iso_dt(last_cust_at)
                 last_bot_dt = parse_iso_dt((existing or {}).get("last_bot_msg_at"))
                 cust_age_sec = (now_utc - cust_dt).total_seconds() if cust_dt else 999999
-                is_recent_msg = bool(cust_dt and cust_age_sec <= 3600)
-                # Allow answering unanswered messages from up to 1h ago even across Render restarts
-                is_after_boot = bool(cust_dt and (cust_dt >= (BOT_STARTED_AT - timedelta(seconds=120)) or cust_age_sec <= 3600))
+                is_recent_msg = bool(cust_dt and cust_age_sec <= 14400)
+                # Allow answering unanswered messages from up to 4h ago even across Render restarts
+                is_after_boot = bool(cust_dt and (cust_dt >= (BOT_STARTED_AT - timedelta(seconds=120)) or cust_age_sec <= 14400))
                 unanswered_by_bot = bool(
                     last_role == "customer"
                     and is_recent_msg
@@ -755,10 +755,7 @@ async def poller_loop() -> None:
                         upsert_data["status"] = "ADMIN_REPLIED"
                         upsert_data["next_followup_at"] = None
                     else:
-                        if unread_cnt == 0 and not new_customer_msg and cust_age_sec >= 180 and existing:
-                            upsert_data["status"] = "ADMIN_REPLIED"
-                        else:
-                            upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
+                        upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
                         upsert_data["followup_stage"] = 0
                         upsert_data["next_followup_at"] = None
                 elif last_role == "admin" and (not existing or new_human_admin_msg or existing.get("status") in ("OPEN", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
