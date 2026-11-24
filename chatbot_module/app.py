@@ -769,10 +769,21 @@ async def poller_loop() -> None:
                         upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
                         upsert_data["followup_stage"] = 0
                         upsert_data["next_followup_at"] = None
-                elif last_role == "admin" and (not existing or new_human_admin_msg or existing.get("status") in ("OPEN", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
-                    if not (existing and existing.get("status") in ("WON", "BLACKLISTED")):
-                        upsert_data["status"] = "ADMIN_REPLIED"
-                        upsert_data["next_followup_at"] = None
+                elif last_role == "admin" and (not existing or new_human_admin_msg or existing.get("status") in ("OPEN", "ADMIN_REPLIED", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
+                    if not (existing and existing.get("status") in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY")):
+                        # If admin replied > 10m ago and customer is still silent & unbilled inside 23h window -> arm 8-Step Follow-up!
+                        admin_idle_sec = (now_utc - admin_dt).total_seconds() if admin_dt else 999999
+                        if (not admin_billed_active) and (not new_human_admin_msg) and admin_idle_sec > 600 and cust_dt and cust_age_sec <= 82800:
+                            upsert_data["status"] = "WAITING_REPLY"
+                            upsert_data["next_followup_at"] = (existing or {}).get("next_followup_at") or _compute_next_followup_iso(int((existing or {}).get("followup_stage") or 0))
+                        else:
+                            upsert_data["status"] = "ADMIN_REPLIED"
+                            upsert_data["next_followup_at"] = None
+                elif last_role == "bot" and (not existing or not (existing.get("next_followup_at"))):
+                    # Survive Render ephemeral DB restarts: re-arm 8-Step Follow-up for unclosed bot-replied chats inside 23h window!
+                    if (not admin_billed_active) and cust_dt and cust_age_sec <= 82800 and (not existing or existing.get("status") not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
+                        upsert_data["status"] = "WAITING_REPLY"
+                        upsert_data["next_followup_at"] = _compute_next_followup_iso(int((existing or {}).get("followup_stage") or 0))
 
                 upsert_conversation(upsert_data)
                 asyncio.create_task(asyncio.to_thread(_check_fraud_and_deletions, psid, cust_name, upsert_data["branch"], raw_msgs))
