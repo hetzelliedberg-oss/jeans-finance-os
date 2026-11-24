@@ -624,6 +624,25 @@ def _build_fallback_3enter(
             "พี่ชอบโทนสีอ่อนหรือสีเข้มดีคะ ปกติใส่เอวเท่าไหร่เอ่ย",
         ]
 
+    # -1j. Asking exact waist/hip measurements of a SPECIFIC size (e.g. "4xlเอวสะโพกเท่าไร", "XL เอวเท่าไหร่")
+    _spec_sz_m = re.search(r"(?<![A-Za-z0-9])(4\s*XL|3\s*XL|2\s*XL|XL|L|M)(?![A-Za-z0-9])", last_cust.upper())
+    if not is_followup and _spec_sz_m and re.search(r"(เท่าไร|เท่าไหร่|กี่นิ้ว|ขนาด|เอว.{0,6}สะโพก)", last_cust):
+        _sz_key = _spec_sz_m.group(1).replace(" ", "")
+        _SIZE_SPEC_MAP = {
+            "M": "เอว 26–28 นิ้ว สะโพก 36–38 นิ้ว",
+            "L": "เอว 28–30 นิ้ว สะโพก 38–40 นิ้ว",
+            "XL": "เอว 30–32 นิ้ว สะโพก 40–42 นิ้ว",
+            "2XL": "เอว 32–34 นิ้ว สะโพก 42–44 นิ้ว",
+            "3XL": "เอว 34–36 นิ้ว สะโพก 44–46 นิ้ว",
+            "4XL": "เอว 38–40 นิ้ว สะโพก 48–50 นิ้ว",
+        }
+        _spec_txt = _SIZE_SPEC_MAP.get(_sz_key, "เอว 26–40 นิ้ว")
+        return [
+            f"{call_name}คะ ไซส์ {_sz_key} {_spec_txt} ค่ะ",
+            "ผ้ายีนส์ยืดนิ่ม ยืดตามตัวได้อีก 1–2 นิ้ว ใส่สบายไม่รัดค่ะ",
+            f"รับเป็นไซส์ {_sz_key} โอนหรือปลายทางแจ้งชื่อ-ที่อยู่ได้เลยค่า",
+        ]
+
     # 0. Multi-fact intelligent response (ONLY if not already recommended in recent bot messages, and never on COD/address/length-concern turns)
     recent_bot_joined = " ".join(already_covered.get("recent_bot_texts", []))
     already_recommended_size = "หนูแนะนำเป็นไซส์" in recent_bot_joined
