@@ -481,16 +481,17 @@ def _check_fraud_and_deletions(psid: str, cust_name: str, branch: str, raw_msgs:
     raw_mids = {m.get("id") for m in raw_msgs if m.get("id")}
     oldest_dt = parse_iso_dt(raw_msgs[0].get("created_time"))
     if oldest_dt:
+        now_utc_chk = datetime.now(timezone.utc)
         with get_conn() as conn:
             saved = conn.execute(
-                "SELECT msg_id, sender_role, text, created_at FROM messages WHERE psid = ? AND msg_id LIKE 'm_%' ORDER BY created_at ASC",
+                "SELECT msg_id, sender_role, text, created_at FROM messages WHERE psid = ? AND sender_role != 'bot' AND msg_id LIKE 'm_%' ORDER BY created_at ASC",
                 (psid,),
             ).fetchall()
         for row in saved:
             mid = row["msg_id"]
             s_dt = parse_iso_dt(row["created_at"])
-            # Only flag messages strictly newer than oldest_dt in the fetched window so pagination cutoff never false-positives
-            if s_dt and s_dt > (oldest_dt + timedelta(seconds=5)) and mid not in raw_mids:
+            # Only flag messages strictly newer than oldest_dt AND older than 90s (avoid Meta indexing lag)
+            if s_dt and s_dt > (oldest_dt + timedelta(seconds=5)) and (now_utc_chk - s_dt).total_seconds() > 90 and mid not in raw_mids:
                 fkey = ("DEL", mid)
                 if fkey not in _FRAUD_SEEN_KEYS:
                     _FRAUD_SEEN_KEYS.add(fkey)
@@ -511,7 +512,7 @@ def _check_fraud_and_deletions(psid: str, cust_name: str, branch: str, raw_msgs:
             continue
         if any(mk in txt for mk in SYSTEM_ORDER_MARKERS) or any(mk in txt for mk in ADMIN_BILL_MARKERS):
             continue
-        if any(st in txt for st in ("📍", "เซนทรัล", "เซ็นทรัล", "พิกัดหน้าร้าน", "0932135716", "082-927-1808", "0829271808", "098-110-8961", "0981108961")):
+        if any(st in txt for st in ("📍", "เซนทรัล", "เซ็นทรัล", "พิกัดหน้าร้าน", "จัดส่งไปที่", "ผู้รับ:", "ที่อยู่:", "ที่อยู่ :", "0932135716", "082-927-1808", "0829271808", "098-110-8961", "0981108961")):
             continue
         digits_list = re.findall(r"\b\d[\d\-]{8,14}\d\b", txt)
         clean_nums = [re.sub(r"\D", "", d) for d in digits_list if 10 <= len(re.sub(r"\D", "", d)) <= 13]
@@ -773,11 +774,12 @@ async def poller_loop() -> None:
                     and last_role == "customer"
                     and is_recent_msg
                     and is_after_boot
-                    and (not existing or existing.get("status") not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY"))
+                    and (not existing or existing.get("status") != "BLACKLISTED")
                 ):
                     latest_saved = get_messages(psid, limit=5)
                     latest_saved_txt = (latest_saved[-1].get("text") or "").strip() if latest_saved else ""
-                    if not _is_closing_or_no_reply_needed(latest_saved_txt, latest_saved):
+                    is_urgent_cust = any(k in latest_saved_txt for k in ("ยกเลิก", "เปลี่ยน", "ผิด", "ไม่ครบ", "ตาม", "คืน", "ตำหนิ"))
+                    if is_urgent_cust or not _is_closing_or_no_reply_needed(latest_saved_txt, latest_saved):
                         last_c_txt = next(
                             ((rm.get("message") or "").strip() for rm in reversed(raw_msgs) if (rm.get("from") or {}).get("id") != meta_client.page_id and (rm.get("message") or "").strip()),
                             "[ส่งรูปภาพ]",
@@ -989,7 +991,7 @@ async def keepalive_loop() -> None:
     await asyncio.sleep(45)
     self_url = os.getenv("RENDER_EXTERNAL_URL", "https://jeans-around-ai-chatbot.onrender.com")
     while True:
-        for url in (f"{self_url}/api/health", "https://jeans-finance-os.onrender.com/api/health"):
+        for url in (f"{self_url}/api/health", "https://jeans-finance-os-gma9.onrender.com/api/health"):
             try:
                 await asyncio.to_thread(_req.get, url, timeout=15)
             except Exception:
