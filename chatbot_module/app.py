@@ -255,12 +255,23 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
             ad_post_text = _AD_POST_CACHE[ad_id_val]
         else:
             ad_post_text = ""
+        # Deep history lookup when customer asks to use their existing/saved address
+        brain_messages = messages
+        if (
+            not is_followup
+            and re.search(r"(ที่อยู่เดิม|ส่งที่เดิม|ใช้ที่อยู่เดิม|ตามที่อยู่เดิม|ที่อยู่เก่า|ส่งตามเดิม|ที่อยู่คุณ|ที่อยู่พี่|ที่อยู่แม่|ส่งที่อยู่|เหมือนเดิม)", last_cust_msg or "")
+            and conv.get("conv_id")
+        ):
+            deep_msgs = await asyncio.to_thread(meta_client.fetch_conversation_messages, conv["conv_id"], 80)
+            if deep_msgs and len(deep_msgs) > len(messages):
+                brain_messages = deep_msgs
+
         bubbles = await asyncio.to_thread(
             generate_3enter_reply,
             conv.get("customer_name", "ลูกค้า"),
             branch,
             intent,
-            messages,
+            brain_messages,
             grill.get("already_covered", {}),
             conv.get("ad_name") or "",
             conv.get("campaign_name") or "",

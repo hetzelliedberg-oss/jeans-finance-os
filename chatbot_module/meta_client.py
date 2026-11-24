@@ -86,6 +86,37 @@ class MetaClient:
             print(f"[MetaClient] fetch_conversations exception: {e}")
             return results
 
+    def fetch_conversation_messages(self, conv_id: str, limit: int = 80) -> List[Dict[str, Any]]:
+        """Fetch deeper message history for a specific conversation (e.g. to pull a returning customer's saved address)."""
+        token = self.get_page_token()
+        if not token or not conv_id:
+            return []
+        try:
+            r = requests.get(
+                f"{GRAPH_BASE}/{conv_id}",
+                params={
+                    "fields": f"messages.limit({limit}){{id,message,from,created_time}}",
+                    "access_token": token,
+                },
+                timeout=20,
+            )
+            data = r.json()
+            raw_msgs = (data.get("messages") or {}).get("data") or []
+            out: List[Dict[str, Any]] = []
+            for m in reversed(raw_msgs):
+                sender_id = (m.get("from") or {}).get("id", "")
+                role = "admin" if sender_id == self.page_id else "customer"
+                out.append({
+                    "msg_id": m.get("id", ""),
+                    "sender_role": role,
+                    "text": (m.get("message") or "").strip(),
+                    "created_at": m.get("created_time", ""),
+                })
+            return out
+        except Exception as e:
+            print(f"[MetaClient] fetch_conversation_messages exception: {e}")
+            return []
+
     def fetch_ads_metadata(self, limit: int = 400) -> List[Dict[str, Any]]:
         ut = self.get_user_token()
         if not ut:

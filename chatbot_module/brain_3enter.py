@@ -254,6 +254,31 @@ def _is_bot_style_msg(txt: str) -> bool:
     )
 
 
+def _extract_saved_address_from_history(messages: List[Dict[str, Any]]) -> str:
+    """Scan full conversation history (newest first) to extract a returning customer's real shipping address + phone."""
+    if not messages:
+        return ""
+    shop_exclude = re.compile(r"(093-?213-?5716|082-?927-?1808|098-?110-?8961|752-?0-?60883-?2|กรุงไทย|สุพัตรา|เซ็นทรัล|หน้าร้าน|โปรหน้าร้าน|ลด 10%|ลด 20%)")
+    phone_re = re.compile(r"(?:\+66|0)[689]\d[\s-]?\d{3}[\s-]?\d{4}")
+    addr_kw = re.compile(r"(หมู่|ม\.|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|ซอย|ซ\.|ถ\.|ถนน|แขวง|เขต|บ้านเลขที่|รหัสไปรษณีย์|\b[1-9]\d{4}\b)")
+    for m in reversed(messages):
+        txt = (m.get("text") or m.get("message") or "").strip()
+        if len(txt) < 22 or shop_exclude.search(txt):
+            continue
+        role = m.get("sender_role", "")
+        # Prefer customer-sent shipping address, or admin/system shipping summary ("จัดส่งไปที่:" / "ผู้รับ:")
+        is_cust_addr = (role == "customer") and bool(phone_re.search(txt)) and (bool(addr_kw.search(txt)) or len(txt) >= 32)
+        is_admin_summary = (role in ("admin", "bot")) and bool(re.search(r"(จัดส่งไปที่|ผู้รับ\s*:)", txt)) and bool(addr_kw.search(txt))
+        if is_cust_addr or is_admin_summary:
+            cleaned = re.sub(r"\s+", " ", txt).strip()
+            # Trim overly verbose bill headers if admin summary
+            cleaned = re.sub(r"^.*?จัดส่งไปที่\s*[:：]?\s*", "", cleaned).strip()
+            if len(cleaned) > 190:
+                cleaned = cleaned[:187].rstrip() + "..."
+            return cleaned
+    return ""
+
+
 def _polish_human_flow(
     bubbles: List[str],
     call_name: str,
@@ -273,15 +298,27 @@ def _polish_human_flow(
     if branch != "ONLINE" and already_covered.get(f"sent_branch_{branch.lower()}"):
         out = [b.replace(branch_desc, short_branch) for b in out]
 
-    # Replace duplicate middle value-add bubble
-    if len(out) >= 3 and (
+    # Replace duplicate or price-spam middle value-add bubble (NEVER repeat price/EMS when already stated!)
+    _price_spam = bool(
+        already_covered.get("sent_price")
+        and any(k in out[1] for k in ("1,290", "ราคาตัวละ", "ราคา 1,", "ส่งฟรี EMS 1–2"))
+        and not any(k in (facts.get("_last_cust") or "") for k in ("ราคา", "กี่บาท", "เท่าไหร่", "โปร"))
+    )
+    _cod_spam = bool(
+        already_covered.get("sent_cod")
+        and "ปลายทาง" in out[1]
+        and "เปลี่ยนไซส์" not in out[1]
+        and not any(k in (facts.get("_last_cust") or "") for k in ("ปลายทาง", "cod", "โอน", "จ่าย"))
+    )
+    if len(out) >= 3 and not out[1].startswith("📍") and (
         _is_dup_bubble(out[1], recent_texts)
-        or (already_covered.get("sent_price") and already_covered.get("sent_cod") and "ส่งฟรี EMS" in out[1] and "เปลี่ยนไซส์" not in out[1])
+        or _price_spam
+        or _cod_spam
     ):
         alt_mid = [
             f"ตัวนี้ผ้ายีนส์ยืดนิ่มฟอกแล้ว ซักไม่หด สีไม่ตก ใส่สบายไม่อึดอัดเลยค่ะ{call_name}",
             "งานตัดเย็บและงานปักเก็บรายละเอียดเรียบร้อยมากค่ะ หากใส่ไม่พอดีทางร้านเปลี่ยนไซส์ให้ได้สบายใจ",
-            (f"หน้าร้าน {short_branch} มีห้องลองให้สวมเทียบไซส์จริง พร้อมโปร 1 ตัวลด 10% / 2 ตัวลด 20% เลยนะคะ" if branch != "ONLINE" else "มีครบไซส์ตั้งแต่ M–4XL รองรับเอว 26–42 นิ้วเลยนะคะ เดี๋ยวหนูช่วยคัดตัวที่ใส่สวยที่สุดให้ค่ะ"),
+            (f"หน้าร้าน {short_branch} มีห้องลองให้สวมเทียบไซส์จริง พร้อมโปร 1 ตัวลด 10% / 2 ตัวลด 20% เลยนะคะ" if branch != "ONLINE" else "ทรงนี้เก็บพุงเก็บสะโพกสวยมากค่ะ ใส่แล้วดูเพรียวขึ้นเลย"),
         ]
         for cand in alt_mid:
             if not _is_dup_bubble(cand, recent_texts) and cand not in out:
@@ -499,23 +536,34 @@ def _build_fallback_3enter(
         return [e1, e2, e3]
 
     # -1e. Customer confirms EXISTING ADDRESS / RECIPIENT NAME (e.g. "ที่อยู่เดิม", "ที่อยู่คุณวาสนา", "ส่งที่เดิม")
-    # NEVER fall through to generic price/stock pitch when customer is already closing the order!
+    # Scan FULL conversation history to pull & paste their exact saved address + phone!
     _existing_addr_re = re.search(
         r"(ที่อยู่เดิม|ส่งที่เดิม|ใช้ที่อยู่เดิม|ตามที่อยู่เดิม|ที่อยู่เก่า|ส่งตามเดิม|ส่งที่เก่า|ที่อยู่คุณ|ที่อยู่พี่|ที่อยู่แม่|ส่งที่อยู่|เหมือนเดิม)",
         last_cust,
     )
     if not is_followup and _existing_addr_re and not any(k in last_cust for k in ["เปลี่ยน", "แก้", "ผิด", "ไม่ถึง", "ตามของ"]):
+        saved_addr = _extract_saved_address_from_history(messages or [])
         rec_sz = facts.get("rec_size")
         has_pay = bool(re.search(r"(ปลายทาง|cod|โอน|พร้อมเพย์)", " ".join(
             [(m.get("text") or m.get("message") or "") for m in session_msgs[-6:] if m.get("sender_role") == "customer"]
         ), re.I))
+        if saved_addr:
+            e1 = f"ได้เลยค่ะ{call_name} หนูดึงที่อยู่เดิมมาให้แล้วนะคะ"
+            e2 = f"📍 {saved_addr}"
+            if rec_sz and has_pay:
+                e3 = f"ส่งตามที่อยู่นี้ ไซส์ {rec_sz} เลยนะคะ เดี๋ยวเปิดบิลแพ็กส่งให้เลยค่า"
+            elif rec_sz:
+                e3 = f"ส่งตามที่อยู่นี้ ไซส์ {rec_sz} สะดวกปลายทางหรือโอนดีคะ"
+            else:
+                e3 = "ส่งตามที่อยู่นี้นะคะ รอบนี้รับไซส์เดิมและปลายทางหรือโอนดีคะ"
+            return [e1, e2, e3]
         if rec_sz:
             e1 = f"ได้เลยค่ะ{call_name} รับทราบใช้ที่อยู่เดิมเลยนะคะ"
-            e2 = f"สรุปไซส์ {rec_sz} ราคา {price_label} ส่งฟรี EMS ค่ะ"
+            e2 = f"สรุปไซส์ {rec_sz} ส่งฟรี EMS นะคะ"
             e3 = (
                 "เดี๋ยวให้แอดมินดึงที่อยู่เดิมเปิดบิลแพ็กส่งให้เลยนะคะ 🙏"
                 if has_pay
-                else "รอบนี้สะดวกปลายทางหรือโอนดีคะ เดี๋ยวเปิดบิลให้เลยค่า"
+                else "รอบนี้สะดวกปลายทางหรือโอนดีคะ เดี๋ยวให้แอดมินดึงที่อยู่เปิดบิลให้เลยค่า"
             )
             return [e1, e2, e3]
         return [
@@ -1491,6 +1539,7 @@ def generate_3enter_reply(
             call_name = f"พี่{short_name}" if short_name else "พี่"
             cust_text = " ".join((m.get("text") or "") for m in session_msgs if m.get("sender_role") == "customer").lower()
             facts = _extract_body_facts(cust_text, last_cust_only=last_c, asked_waist=bool(already_covered.get("asked_size")))
+            facts["_last_cust"] = last_c
             res = _polish_human_flow(res, call_name, branch, BRANCH_MAP.get(branch, BRANCH_MAP["ONLINE"]), already_covered, facts)
     return _enforce_1line_human_bubbles(res)
 
@@ -1524,7 +1573,7 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubb
         return chunks
 
     for s in body:
-        if len(s) <= max_len or "http" in s or "ตาราง" in s or "\n" in s:
+        if len(s) <= max_len or "http" in s or "ตาราง" in s or "\n" in s or s.startswith("📍"):
             out.append(s)
             continue
         parts = [p.strip() for p in re.sub(r"(นะคะ|นะครับ|เลยค่ะ|เลยน้า|ได้ค่ะ|ได้น้า|ค่ะ|คะ|ค่า)(?=\s|$)\s*", r"\1|||", s).split("|||") if p.strip()]
