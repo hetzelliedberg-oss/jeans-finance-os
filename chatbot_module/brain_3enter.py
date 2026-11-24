@@ -295,11 +295,15 @@ def _polish_human_flow(
         rec_sz = facts.get("rec_size")
         alt_q = []
         if rec_sz:
-            alt_q.append(f"ถ้า{call_name}รับไซส์ {rec_sz} ส่งฟรี EMS หรือเก็บเงินปลายทาง แจ้งชื่อ-ที่อยู่-เบอร์โทรให้หนูเช็กสต็อกพร้อมส่งได้เลยนะคะ?")
-        alt_q.extend([
-            f"สะดวกให้หนูเช็กสต็อกไซส์พร้อมส่งให้เลยไหมคะ{call_name}?",
-            f"ถ้า{call_name}สนใจรับ แจ้งไซส์หรือชื่อ-ที่อยู่-เบอร์โทรจัดส่งไว้ได้เลยนะคะ?",
-        ])
+            alt_q.extend([
+                f"รับไซส์ {rec_sz} เป็นโอน หรือเก็บปลายทางดีคะ",
+                f"แจ้งชื่อ ที่อยู่ เบอร์โทรไว้ให้หนูแพ็กส่งได้เลยค่า",
+            ])
+        else:
+            alt_q.extend([
+                f"ปกติ{call_name}ใส่เอวเท่าไหร่แจ้งหนูเช็กไซส์ให้ได้เลยค่า",
+                f"ถ้า{call_name}สนใจรับ แจ้งไซส์หรือชื่อ-ที่อยู่-เบอร์โทรจัดส่งไว้ได้เลยค่า",
+            ])
         for cand in alt_q:
             if not _is_dup_bubble(cand, recent_texts) and cand not in out:
                 out[-1] = cand
@@ -493,6 +497,45 @@ def _build_fallback_3enter(
         )
         e3 = f"ปกติ{call_name}ใส่เอว-สะโพกประมาณเท่าไหร่คะ แจ้งมาให้หนูเทียบไซส์ที่ใส่สวยพอดีตัวให้ได้เลยค่ะ?"
         return [e1, e2, e3]
+
+    # -1e. Customer confirms EXISTING ADDRESS / RECIPIENT NAME (e.g. "ที่อยู่เดิม", "ที่อยู่คุณวาสนา", "ส่งที่เดิม")
+    # NEVER fall through to generic price/stock pitch when customer is already closing the order!
+    _existing_addr_re = re.search(
+        r"(ที่อยู่เดิม|ส่งที่เดิม|ใช้ที่อยู่เดิม|ตามที่อยู่เดิม|ที่อยู่เก่า|ส่งตามเดิม|ส่งที่เก่า|ที่อยู่คุณ|ที่อยู่พี่|ที่อยู่แม่|ส่งที่อยู่|เหมือนเดิม)",
+        last_cust,
+    )
+    if not is_followup and _existing_addr_re and not any(k in last_cust for k in ["เปลี่ยน", "แก้", "ผิด", "ไม่ถึง", "ตามของ"]):
+        rec_sz = facts.get("rec_size")
+        has_pay = bool(re.search(r"(ปลายทาง|cod|โอน|พร้อมเพย์)", " ".join(
+            [(m.get("text") or m.get("message") or "") for m in session_msgs[-6:] if m.get("sender_role") == "customer"]
+        ), re.I))
+        if rec_sz:
+            e1 = f"ได้เลยค่ะ{call_name} รับทราบใช้ที่อยู่เดิมเลยนะคะ"
+            e2 = f"สรุปไซส์ {rec_sz} ราคา {price_label} ส่งฟรี EMS ค่ะ"
+            e3 = (
+                "เดี๋ยวให้แอดมินดึงที่อยู่เดิมเปิดบิลแพ็กส่งให้เลยนะคะ 🙏"
+                if has_pay
+                else "รอบนี้สะดวกปลายทางหรือโอนดีคะ เดี๋ยวเปิดบิลให้เลยค่า"
+            )
+            return [e1, e2, e3]
+        return [
+            f"ได้เลยค่ะ{call_name} รับทราบใช้ที่อยู่เดิมเลยนะคะ",
+            "รอบนี้รับเป็นไซส์เดิม หรือไซส์ไหนดีคะ",
+            "สะดวกเก็บเงินปลายทางหรือโอนแจ้งหนูได้เลย เดี๋ยวให้แอดมินเปิดบิลให้ค่า",
+        ]
+
+    # -1f. Short order-ready confirmation when size is ALREADY picked (e.g. "เอาเลย", "จัดเลย", "ได้ค่ะ", "ตกลง")
+    if (
+        not is_followup
+        and facts.get("rec_size")
+        and re.match(r"^(?:เอาเลย|จัดเลย|รับเลย|สั่งเลย|ได้ค่ะ|ได้คะ|ได้จ้า|โอเค|ok|ตกลง|ค่ะ|คะ|ค่า|จ้า)[!.\s🙏❤️👍]*$", last_cust.strip(), re.I)
+    ):
+        rec_sz = facts["rec_size"]
+        return [
+            f"ได้เลยค่ะ{call_name} ล็อกไซส์ {rec_sz} ไว้ให้เลยนะคะ",
+            "ส่งชื่อ-ที่อยู่-เบอร์โทร (หรือแจ้งใช้ที่อยู่เดิม) ได้เลยค่ะ",
+            "รอบนี้สะดวกโอน หรือเก็บเงินปลายทางดีคะ",
+        ]
 
     # 0. Multi-fact intelligent response (ONLY if not already recommended in recent bot messages, and never on COD/address/length-concern turns)
     recent_bot_joined = " ".join(already_covered.get("recent_bot_texts", []))
