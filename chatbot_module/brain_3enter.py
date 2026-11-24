@@ -1484,7 +1484,7 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubb
         if len(s) <= max_len or "http" in s or "ตาราง" in s or "\n" in s:
             out.append(s)
             continue
-        parts = [p.strip() for p in re.sub(r"(นะคะ|นะครับ|เลยค่ะ|เลยน้า|ได้ค่ะ|ได้น้า|ค่ะ|คะ|น้า|ค่า)\s*", r"\1|||", s).split("|||") if p.strip()]
+        parts = [p.strip() for p in re.sub(r"(นะคะ|นะครับ|เลยค่ะ|เลยน้า|ได้ค่ะ|ได้น้า|ค่ะ|คะ|ค่า)(?=\s|$)\s*", r"\1|||", s).split("|||") if p.strip()]
         if len(parts) > 1 and len(parts[0]) <= max_len + 10:
             out.append(parts[0])
         else:
@@ -1495,7 +1495,7 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubb
     if len(clean_closing) <= max_len + 8 or "http" in clean_closing or "ตาราง" in clean_closing or "\n" in clean_closing:
         out.append(clean_closing)
     else:
-        c_parts = [p.strip() for p in re.sub(r"(ค่ะ|นะคะ|น้า|ค่า|คะ)\s*", r"\1|||", clean_closing).split("|||") if p.strip()]
+        c_parts = [p.strip() for p in re.sub(r"(ค่ะ|นะคะ|เลยน้า|ได้น้า|ค่า|คะ)(?=\s|$)\s*", r"\1|||", clean_closing).split("|||") if p.strip()]
         chosen = c_parts[-1] if (c_parts and len(c_parts[-1]) >= 12) else clean_closing
         out.extend(_split_clean_1line(chosen, max_len + 8)[:2])
     # Remove trailing '?' from Thai messages and drop any standalone '?' bubble
