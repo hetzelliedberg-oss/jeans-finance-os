@@ -468,16 +468,54 @@ def grill_conversation(
         if role == "customer" and txt and not any(mk in txt for mk in SYSTEM_ORDER_MARKERS):
             unhandled_cust.append(txt)
     unhandled_cust.reverse()
-    unhandled_joined = " ".join(unhandled_cust[-4:]) or last_cust_text
-    for pat in COMPLAINT_PATTERNS:
+    unhandled_joined = " ".join(unhandled_cust[-5:]) or last_cust_text
+    extra_exchange_pats = (r"ส่งกลับ", r"ส่งไปเปลี่ยน", r"ตัวที่ส่ง", r"ส่งคืน", r"เปลี่ยนไซส์")
+    for pat in tuple(COMPLAINT_PATTERNS) + extra_exchange_pats:
         if re.search(pat, last_cust_text, re.IGNORECASE) or re.search(pat, unhandled_joined, re.IGNORECASE):
             return {
                 "decision": "HANDOFF_ESCALATE",
-                "reason": f"Support/claim keyword detected ('{pat}') -> Escalate to Telegram human admin",
+                "reason": f"Support/claim/exchange keyword detected ('{pat}') -> Escalate to Telegram human admin",
                 "branch": branch,
                 "intent": intent,
                 "already_covered": covered,
             }
+
+    # 2a-ter. Explicit customer defer/closing ("เดี๋ยวสิ้นเดือนทักไปสั่ง", "ไว้ก่อน", "สั่งออนไลน์แล้วรอรับของ") ->
+    # STOP immediately & close gracefully (NEVER push sales or fire follow-ups!)
+    defer_or_ordered_pats = (
+        r"สิ้นเดือน", r"เงินเดือนออก", r"เดี๋ยวทักไปสั่ง", r"เดี๋ยวค่อยสั่ง", r"ค่อยสั่ง",
+        r"ไว้ก่อน", r"ยังก่อน", r"เดี๋ยวค่อย", r"รอเงิน", r"ค่อยทัก", r"ทักไปใหม่",
+        r"ไว้ทีหลัง", r"ดูไว้ก่อน", r"ขอคิดดูก่อน", r"ไว้โอกาสหน้า", r"ยังไม่รีบ",
+        r"สั่งแล้ว", r"สั่งออนไลน์แล้ว", r"สั่งไปแล้ว", r"รอรับของ", r"รอของ",
+    )
+    if any(re.search(p, last_cust_text, re.IGNORECASE) for p in defer_or_ordered_pats) or (
+        is_followup and any(re.search(p, unhandled_joined, re.IGNORECASE) for p in defer_or_ordered_pats)
+    ):
+        return {
+            "decision": "BLOCK",
+            "end_conversation": True,
+            "reason": f"Customer deferred purchase or already ordered -> Stop gracefully without selling",
+            "branch": branch,
+            "intent": intent,
+            "already_covered": covered,
+        }
+
+    # 2a-quater. Specific stock-out check or multi-item fabric comparison ("M หมดมี L ไหม", "2 ตัวนี้ ผ้าเหมือนกันมั๊ย") ->
+    # Escalate to human admin who has live warehouse/fabric knowledge (never guess stock!)
+    if not is_followup:
+        stock_or_compare_pats = (
+            r"ผ้าเหมือนกัน", r"เหมือนกันมั๊ย", r"เหมือนกันไหม", r"ต่างกันยังไง", r"ต่างกันไหม", r"2\s*ตัวนี้",
+            r"หมดมี", r"หมดแล้วหรอ", r"เหลือไหม", r"มี\s*(?:ไซส์\s*)?(?:s|m|l|xl|2xl|3xl|4xl)\s*(?:ไหม|มั๊ย|มั้ย|เปล่า|ป่าว)",
+        )
+        for pat in stock_or_compare_pats:
+            if re.search(pat, last_cust_text, re.IGNORECASE):
+                return {
+                    "decision": "HANDOFF_ESCALATE",
+                    "reason": f"Live stock/fabric comparison question ('{pat}') -> Escalate to human admin",
+                    "branch": branch,
+                    "intent": intent,
+                    "already_covered": covered,
+                }
 
     # 2a-bis. Delivery/store-purchase confirmation ("ได้รับของแล้ว", "สินค้าถึงมือ", "ไปซื้อมาเรียบร้อยแล้ว") ->
     # Send ONE warm thank-you + fabric care reply (NO selling!) and close gracefully; block repeated acks.

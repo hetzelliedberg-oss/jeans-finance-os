@@ -688,7 +688,7 @@ def _build_fallback_3enter(
                 parts_e1.append(_pick_var([
                     f"{call_name}คะ จาก{stat_label} หนูแนะนำเป็นไซส์ {facts['rec_size']} จะใส่สบายพอดีตัวที่สุดเลยค่ะ (ผ้ายีนส์ยืดนิ่ม ยืดหยุ่นได้อีก 1–2 นิ้ว)",
                     f"จาก{stat_label} ใส่ไซส์ {facts['rec_size']} กำลังสวยพอดีเลยค่ะ{call_name} เนื้อผ้ายีนส์ยืดตามตัวได้อีก 1–2 นิ้วไม่อึดอัดค่ะ",
-                    f"{call_name}ใส่ไซส์ {facts['rec_size']} ได้พอดีเลยนะคะรุ่นนี้ จาก{stat_label}ผ้ายืดนิ่มเก็บทรงสวย ใส่แล้วดูเพรียวเลยค่ะ",
+                    f"{call_name}ใส่ไซส์ {facts['rec_size']} ได้พอดีเลยนะคะรุ่นนี้ จาก {stat_label} ผ้ายืดนิ่มเก็บทรงสวยค่ะ",
                     f"สัดส่วน{stat_label} หนูเทียบให้เป็นไซส์ {facts['rec_size']} นะคะ{call_name} ตัวนี้ผ้ายีนส์ยืดนิ่มใส่สบายค่ะ",
                 ], "stat"))
             if facts["height"] and facts["height"] <= 158 and not is_skirt and not is_shorts:
@@ -1602,8 +1602,8 @@ def generate_3enter_reply(
     return _enforce_1line_human_bubbles(res)
 
 
-def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubbles: int = 4) -> List[str]:
-    """Keep each bubble to a crisp 1-line human-style chat message without dropping core answer or closing question."""
+def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 68, max_bubbles: int = 3) -> List[str]:
+    """Keep each bubble to a crisp 1-line human-style chat message (max 3 short bubbles) without breaking mid-phrase."""
     cleaned = [(b or "").strip() for b in bubbles if (b or "").strip()]
     if not cleaned:
         return bubbles
@@ -1613,8 +1613,8 @@ def _enforce_1line_human_bubbles(bubbles: List[str], max_len: int = 54, max_bubb
     def _split_clean_1line(text: str, limit: int) -> List[str]:
         if len(text) <= limit or "http" in text or "ตาราง" in text or "\n" in text:
             return [text]
-        # Protect parenthesized segments so we never break inside (...)
-        tokens = re.findall(r"\([^)]*\)|\S+", text)
+        # Protect parenthesized segments and Thai measurement pairs (e.g. "เอว 36", "สะโพก 42", "ไซส์ 3XL")
+        tokens = re.findall(r"\([^)]*\)|(?:เอว|สะโพก|ไซส์|ราคา|ตัวละ)\s+\S+|\S+", text)
         if len(tokens) <= 1:
             return [text]
         chunks: List[str] = []

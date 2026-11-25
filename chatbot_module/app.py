@@ -584,11 +584,20 @@ async def poller_loop() -> None:
                     ex_cust_dt = parse_iso_dt(existing.get("last_customer_msg_at"))
                     ex_bot_dt = parse_iso_dt(existing.get("last_bot_msg_at"))
                     ex_adm_dt = parse_iso_dt(existing.get("last_admin_msg_at"))
-                    # 1) ALWAYS-ON AI: if customer messaged in last 30m and BOT hasn't replied yet -> fall through immediately (NEVER yield to admin!)
-                    if ex_st not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL") and ex_cust_dt and (not ex_bot_dt or ex_cust_dt > ex_bot_dt) and (ex_now - ex_cust_dt).total_seconds() <= 1800:
+                    # 1) Smart Human-Admin Grace (180s): if human admin just replied within 3m, DO NOT interrupt live human chat!
+                    # Otherwise if customer messaged in last 30m and neither admin nor bot replied after customer -> fall through so AI answers!
+                    ex_admin_active = bool(ex_adm_dt and (ex_now - ex_adm_dt).total_seconds() <= 180)
+                    if (
+                        not ex_admin_active
+                        and ex_st not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")
+                        and ex_cust_dt
+                        and (not ex_bot_dt or ex_cust_dt > ex_bot_dt)
+                        and (not ex_adm_dt or ex_cust_dt > ex_adm_dt)
+                        and (ex_now - ex_cust_dt).total_seconds() <= 1800
+                    ):
                         pass
-                    # 2) If admin replied > 5m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
-                    elif ex_st == "ADMIN_REPLIED" and ex_adm_dt and ex_cust_dt and (ex_now - ex_adm_dt).total_seconds() > 300 and (ex_now - ex_cust_dt).total_seconds() <= 82800:
+                    # 2) If admin replied > 10m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
+                    elif ex_st == "ADMIN_REPLIED" and ex_adm_dt and ex_cust_dt and (ex_now - ex_adm_dt).total_seconds() > 600 and (ex_now - ex_cust_dt).total_seconds() <= 82800:
                         upsert_conversation({
                             "psid": psid,
                             "status": "WAITING_REPLY",
@@ -767,15 +776,17 @@ async def poller_loop() -> None:
                 is_recent_msg = bool(cust_dt and cust_age_sec <= 14400)
                 # Allow answering unanswered messages from up to 4h ago even across Render restarts
                 is_after_boot = bool(cust_dt and (cust_dt >= (BOT_STARTED_AT - timedelta(seconds=120)) or cust_age_sec <= 14400))
-                # ALWAYS-ON AI: answer every customer message the bot hasn't replied to yet — NEVER yield to human admin!
+                admin_dt = parse_iso_dt(last_human_admin_at)
+                admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
+                admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 180)
+                # Smart AI: answer every unanswered customer message immediately when human admin is NOT actively chatting (3m grace)
                 bot_needs_reply = bool(
-                    last_role != "bot"
+                    last_role == "customer"
+                    and not admin_active_recent
                     and cust_dt
                     and (not last_bot_dt or cust_dt > last_bot_dt)
                     and (new_customer_msg or cust_age_sec <= 1800)
                 )
-                admin_dt = parse_iso_dt(last_human_admin_at)
-                admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
                 bill_dt = parse_iso_dt(last_bill_at)
                 admin_billed_active = bool(bill_dt and (now_utc - bill_dt).total_seconds() <= 82800 and not ad_click_after_bill)
                 recover_unanswered = bool(
@@ -785,9 +796,16 @@ async def poller_loop() -> None:
                 if admin_billed_active and not new_customer_msg:
                     upsert_data["status"] = "WON"
                     upsert_data["next_followup_at"] = None
-                elif (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
+                elif admin_active_recent and last_role == "admin":
+                    if not (existing and existing.get("status") in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY")):
+                        upsert_data["status"] = "ADMIN_REPLIED"
+                        upsert_data["next_followup_at"] = None
+                elif last_role == "customer" and (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
                     if admin_billed_active:
                         upsert_data["status"] = "WON"
+                        upsert_data["next_followup_at"] = None
+                    elif admin_active_recent:
+                        upsert_data["status"] = "ADMIN_REPLIED"
                         upsert_data["next_followup_at"] = None
                     else:
                         upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
@@ -795,7 +813,8 @@ async def poller_loop() -> None:
                         upsert_data["next_followup_at"] = None
                 elif last_role == "admin" and (not existing or new_human_admin_msg or existing.get("status") in ("OPEN", "ADMIN_REPLIED", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
                     if not (existing and existing.get("status") in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY")):
-                        if (not admin_billed_active) and cust_dt and cust_age_sec <= 82800:
+                        admin_idle_sec = (now_utc - admin_dt).total_seconds() if admin_dt else 999999
+                        if (not admin_billed_active) and admin_idle_sec > 600 and cust_dt and cust_age_sec <= 82800:
                             upsert_data["status"] = "WAITING_REPLY"
                             upsert_data["next_followup_at"] = (existing or {}).get("next_followup_at") or _compute_next_followup_iso(int((existing or {}).get("followup_stage") or 0))
                         else:
