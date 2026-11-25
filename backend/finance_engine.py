@@ -80,6 +80,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             COALESCE(SUM(kkc_spend), 0.0) as kkc_ads,
             COALESCE(SUM(korat_spend), 0.0) as korat_ads,
             COALESCE(SUM(udn_spend), 0.0) as udn_ads,
+            COALESCE(SUM(live_spend), 0.0) as live_ads,
             COALESCE(SUM(total_spend), 0.0) as total_ads
         FROM daily_fb_ads
         WHERE date >= ? AND date <= ?
@@ -89,6 +90,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     fb_kkc_spend = float(fb_row["kkc_ads"])
     fb_korat_spend = float(fb_row["korat_ads"]) if "korat_ads" in fb_row.keys() else 0.0
     fb_udn_spend = float(fb_row["udn_ads"]) if "udn_ads" in fb_row.keys() else 0.0
+    fb_live_spend = float(fb_row["live_ads"]) if "live_ads" in fb_row.keys() else 0.0
 
     # Fetch Orders in range
     cur.execute("""
@@ -101,6 +103,7 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     kkc_orders = [o for o in all_orders if o["source_channel"] in ["kkc", "storefront_kkc"]]
     korat_orders = [o for o in all_orders if o["source_channel"] in ["korat", "storefront_korat"]]
     udn_orders = [o for o in all_orders if o["source_channel"] in ["udn", "storefront_udn", "udon"]]
+    live_orders = [o for o in all_orders if o["source_channel"] in ["live", "live_fb", "order_live"]]
 
     # 1. ONLINE CHANNEL CALCULATION
     online_orders_count = len(online_orders)
@@ -187,15 +190,33 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
     udn_net_profit = udn_gross_profit - udn_expenses
     udn_net_margin = (udn_net_profit / udn_gross_sales * 100) if udn_gross_sales > 0 else 0.0
 
+    # 4b. LIVE CHANNEL CALCULATION (No extra staff salary — uses office staff; includes Live FB Ads + packing + COD fee)
+    live_orders_count = len(live_orders)
+    live_pieces = sum(o["total_pieces"] for o in live_orders)
+    live_gross_sales = sum(o["total_sales"] for o in live_orders)
+    live_cod_rev = sum(o["cod_amount"] for o in live_orders)
+    live_transfer_rev = sum(o["transfer_amount"] for o in live_orders)
+    live_cogs = sum(o["cogs_total"] for o in live_orders)
+    live_gross_profit = live_gross_sales - live_cogs
+    live_gross_margin = (live_gross_profit / live_gross_sales * 100) if live_gross_sales > 0 else 0.0
+
+    live_labor = 0.0
+    live_misc = live_orders_count * online_misc_rate
+    live_cod_fee = live_cod_rev * (online_cod_fee_pct / 100.0)
+    live_ads = fb_live_spend
+    live_expenses = live_labor + live_misc + live_cod_fee + live_ads
+    live_net_profit = live_gross_profit - live_expenses
+    live_net_margin = (live_net_profit / live_gross_sales * 100) if live_gross_sales > 0 else 0.0
+
     # 5. CONSOLIDATED
-    cons_orders_count = online_orders_count + kkc_orders_count + korat_orders_count + udn_orders_count
-    cons_pieces = online_pieces + kkc_pieces + korat_pieces + udn_pieces
-    cons_gross_sales = online_gross_sales + kkc_gross_sales + korat_gross_sales + udn_gross_sales
-    cons_cogs = online_cogs + kkc_cogs + korat_cogs + udn_cogs
+    cons_orders_count = online_orders_count + kkc_orders_count + korat_orders_count + udn_orders_count + live_orders_count
+    cons_pieces = online_pieces + kkc_pieces + korat_pieces + udn_pieces + live_pieces
+    cons_gross_sales = online_gross_sales + kkc_gross_sales + korat_gross_sales + udn_gross_sales + live_gross_sales
+    cons_cogs = online_cogs + kkc_cogs + korat_cogs + udn_cogs + live_cogs
     cons_gross_profit = cons_gross_sales - cons_cogs
     cons_gross_margin = (cons_gross_profit / cons_gross_sales * 100) if cons_gross_sales > 0 else 0.0
 
-    cons_expenses = online_expenses + kkc_expenses + korat_expenses + udn_expenses
+    cons_expenses = online_expenses + kkc_expenses + korat_expenses + udn_expenses + live_expenses
     cons_net_profit = cons_gross_profit - cons_expenses
     cons_net_margin = (cons_net_profit / cons_gross_sales * 100) if cons_gross_sales > 0 else 0.0
 
@@ -320,11 +341,42 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             "transfer_amount": udn_gross_sales
         }
 
+    elif channel in ["live", "live_fb", "order_live"]:
+        target_sales = live_gross_sales
+        pnl_lines = [
+            {"label": "1. ยอดขายช่องทางไลฟ์สด (Live Sales)", "amount": live_gross_sales, "pct": 100.0, "type": "revenue", "bold": True},
+            {"label": "   - ยอดโอน (Bank Transfer)", "amount": live_transfer_rev, "pct": pct(live_transfer_rev, target_sales), "type": "sub"},
+            {"label": "   - ยอดเก็บเงินปลายทาง (COD)", "amount": live_cod_rev, "pct": pct(live_cod_rev, target_sales), "type": "sub"},
+            {"label": "2. หัก ต้นทุนสินค้าไลฟ์สด (COGS)", "amount": live_cogs, "pct": pct(live_cogs, target_sales), "type": "cost", "bold": True},
+            {"label": "3. กำไรขั้นต้นไลฟ์สด (Gross Profit)", "amount": live_gross_profit, "pct": live_gross_margin, "type": "gross_profit", "bold": True},
+            {"label": "4. ค่าใช้จ่ายช่องทางไลฟ์สด (Live Expenses):", "amount": live_expenses, "pct": pct(live_expenses, target_sales), "type": "header", "bold": True},
+            {"label": "   - ค่าคนเพิ่ม (0 บ. — ใช้ทีมงานออฟฟิต)", "amount": live_labor, "pct": 0.0, "type": "expense"},
+            {"label": "   - ค่าแอด Facebook Ads ไลฟ์สด (เฉพาะแคมเปญไลฟ์)", "amount": live_ads, "pct": pct(live_ads, target_sales), "type": "expense"},
+            {"label": "   - ค่าจิปาถะ/แพ็คของไลฟ์สด (3 บ./ออเดอร์)", "amount": live_misc, "pct": pct(live_misc, target_sales), "type": "expense"},
+            {"label": "   - ค่าธรรมเนียม COD ไลฟ์สด (2.14% ยอดปลายทาง)", "amount": live_cod_fee, "pct": pct(live_cod_fee, target_sales), "type": "expense"},
+            {"label": "5. กำไรสุทธิไลฟ์สด (Live Net Profit)", "amount": live_net_profit, "pct": live_net_margin, "type": "net_profit", "bold": True}
+        ]
+        kpi = {
+            "sales": live_gross_sales,
+            "cogs": live_cogs,
+            "gross_profit": live_gross_profit,
+            "gross_margin": round(live_gross_margin, 2),
+            "expenses": live_expenses,
+            "expenses_pct": pct(live_expenses, target_sales),
+            "net_profit": live_net_profit,
+            "net_margin": round(live_net_margin, 2),
+            "orders_count": live_orders_count,
+            "pieces_count": live_pieces,
+            "cod_amount": live_cod_rev,
+            "transfer_amount": live_transfer_rev
+        }
+
     else: # Consolidated
         target_sales = cons_gross_sales
         pnl_lines = [
             {"label": "1. ยอดขายรวมทั้งบริษัท (Consolidated Sales)", "amount": cons_gross_sales, "pct": 100.0, "type": "revenue", "bold": True},
             {"label": "   [ออนไลน์] ยอดขายช่องทางออนไลน์", "amount": online_gross_sales, "pct": pct(online_gross_sales, target_sales), "type": "sub"},
+            {"label": "   [ไลฟ์สด] ยอดขายช่องทางไลฟ์สด", "amount": live_gross_sales, "pct": pct(live_gross_sales, target_sales), "type": "sub"},
             {"label": "   [หน้าร้าน] ยอดขายหน้าร้านเซนทรัล KKC", "amount": kkc_gross_sales, "pct": pct(kkc_gross_sales, target_sales), "type": "sub"},
             {"label": "   [หน้าร้าน] ยอดขายหน้าร้านเซนทรัล โคราช", "amount": korat_gross_sales, "pct": pct(korat_gross_sales, target_sales), "type": "sub"},
             {"label": "   [หน้าร้าน] ยอดขายหน้าร้านเซนทรัล อุดรธานี", "amount": udn_gross_sales, "pct": pct(udn_gross_sales, target_sales), "type": "sub"},
@@ -336,22 +388,26 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             {"label": "   - ค่าแอด Facebook Ads ออนไลน์", "amount": online_ads, "pct": pct(online_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/แพ็คของออนไลน์ (3 บ./ออเดอร์)", "amount": online_misc, "pct": pct(online_misc, target_sales), "type": "expense"},
             {"label": "   - ค่าธรรมเนียม COD ออนไลน์ (2.14%)", "amount": online_cod_fee, "pct": pct(online_cod_fee, target_sales), "type": "expense"},
-            {"label": "5. ค่าใช้จ่ายหน้าร้านเซนทรัล KKC (KKC Expenses):", "amount": kkc_expenses, "pct": pct(kkc_expenses, target_sales), "type": "header", "bold": True},
+            {"label": "5. ค่าใช้จ่ายช่องทางไลฟ์สด (Live Expenses — ไม่มีค่าคนเพิ่ม):", "amount": live_expenses, "pct": pct(live_expenses, target_sales), "type": "header", "bold": True},
+            {"label": "   - ค่าแอด Facebook Ads ไลฟ์สด", "amount": live_ads, "pct": pct(live_ads, target_sales), "type": "expense"},
+            {"label": "   - ค่าจิปาถะ/แพ็คของไลฟ์สด (3 บ./ออเดอร์)", "amount": live_misc, "pct": pct(live_misc, target_sales), "type": "expense"},
+            {"label": "   - ค่าธรรมเนียม COD ไลฟ์สด (2.14%)", "amount": live_cod_fee, "pct": pct(live_cod_fee, target_sales), "type": "expense"},
+            {"label": "6. ค่าใช้จ่ายหน้าร้านเซนทรัล KKC (KKC Expenses):", "amount": kkc_expenses, "pct": pct(kkc_expenses, target_sales), "type": "header", "bold": True},
             {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล KKC ({kkc_rent_desc})", "amount": kkc_rent, "pct": pct(kkc_rent, target_sales), "type": "expense"},
             {"label": "   - ค่าคนหน้าร้านเซนทรัล KKC (460/500 บ.)", "amount": kkc_labor, "pct": pct(kkc_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads หน้าร้าน KKC", "amount": kkc_ads, "pct": pct(kkc_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน KKC (6 บ./ออเดอร์)", "amount": kkc_misc, "pct": pct(kkc_misc, target_sales), "type": "expense"},
-            {"label": "6. ค่าใช้จ่ายหน้าร้านเซนทรัล โคราช (Korat Expenses):", "amount": korat_expenses, "pct": pct(korat_expenses, target_sales), "type": "header", "bold": True},
+            {"label": "7. ค่าใช้จ่ายหน้าร้านเซนทรัล โคราช (Korat Expenses):", "amount": korat_expenses, "pct": pct(korat_expenses, target_sales), "type": "header", "bold": True},
             {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล โคราช ({korat_rent_desc})", "amount": korat_rent, "pct": pct(korat_rent, target_sales), "type": "expense"},
             {"label": f"   - ค่าคนหน้าร้านเซนทรัล โคราช ({korat_labor_desc})", "amount": korat_labor, "pct": pct(korat_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads หน้าร้าน โคราช", "amount": korat_ads, "pct": pct(korat_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน โคราช (6 บ./ออเดอร์)", "amount": korat_misc, "pct": pct(korat_misc, target_sales), "type": "expense"},
-            {"label": "7. ค่าใช้จ่ายหน้าร้านเซนทรัล อุดรธานี (UDN Expenses):", "amount": udn_expenses, "pct": pct(udn_expenses, target_sales), "type": "header", "bold": True},
+            {"label": "8. ค่าใช้จ่ายหน้าร้านเซนทรัล อุดรธานี (UDN Expenses):", "amount": udn_expenses, "pct": pct(udn_expenses, target_sales), "type": "header", "bold": True},
             {"label": f"   - ค่าเช่าหน้าร้านเซนทรัล อุดรธานี ({udn_rent_desc})", "amount": udn_rent, "pct": pct(udn_rent, target_sales), "type": "expense"},
             {"label": f"   - ค่าคนหน้าร้านเซนทรัล อุดรธานี ({udn_labor_desc})", "amount": udn_labor, "pct": pct(udn_labor, target_sales), "type": "expense"},
             {"label": "   - ค่าแอด Facebook Ads หน้าร้าน อุดรธานี", "amount": udn_ads, "pct": pct(udn_ads, target_sales), "type": "expense"},
             {"label": "   - ค่าจิปาถะ/ถุงหน้าร้าน อุดรธานี (6 บ./ออเดอร์)", "amount": udn_misc, "pct": pct(udn_misc, target_sales), "type": "expense"},
-            {"label": "8. กำไรสุทธิรวมทั้งบริษัท (Consolidated Net Profit)", "amount": cons_net_profit, "pct": cons_net_margin, "type": "net_profit", "bold": True}
+            {"label": "9. กำไรสุทธิรวมทั้งบริษัท (Consolidated Net Profit)", "amount": cons_net_profit, "pct": cons_net_margin, "type": "net_profit", "bold": True}
         ]
         kpi = {
             "sales": cons_gross_sales,
@@ -365,21 +421,24 @@ def calculate_pnl(start_date: str, end_date: str, channel: str = "consolidated")
             "orders_count": cons_orders_count,
             "pieces_count": cons_pieces,
             "online_sales": online_gross_sales,
+            "live_sales": live_gross_sales,
             "kkc_sales": kkc_gross_sales,
             "korat_sales": korat_gross_sales,
             "udn_sales": udn_gross_sales,
             "online_net_profit": online_net_profit,
+            "live_net_profit": live_net_profit,
             "kkc_net_profit": kkc_net_profit,
             "korat_net_profit": korat_net_profit,
             "udn_net_profit": udn_net_profit,
             "online_expenses": online_expenses,
+            "live_expenses": live_expenses,
             "kkc_expenses": kkc_expenses,
             "korat_expenses": korat_expenses,
             "udn_expenses": udn_expenses
         }
 
     # 4. ADMIN LEADERBOARD & BREAKDOWN
-    target_orders = online_orders if channel == "online" else (kkc_orders if channel in ["kkc", "storefront_kkc"] else (korat_orders if channel in ["korat", "storefront_korat"] else (udn_orders if channel in ["udn", "storefront_udn", "udon"] else all_orders)))
+    target_orders = online_orders if channel == "online" else (live_orders if channel in ["live", "live_fb", "order_live"] else (kkc_orders if channel in ["kkc", "storefront_kkc"] else (korat_orders if channel in ["korat", "storefront_korat"] else (udn_orders if channel in ["udn", "storefront_udn", "udon"] else all_orders))))
     admin_map: Dict[str, Dict[str, Any]] = {}
     for o in target_orders:
         name = o["sender_name"] or "ไม่ระบุแอดมิน"

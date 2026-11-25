@@ -175,6 +175,8 @@ def init_db():
         cur.execute("ALTER TABLE daily_fb_ads ADD COLUMN korat_spend REAL NOT NULL DEFAULT 0.0")
     if "udn_spend" not in fb_cols:
         cur.execute("ALTER TABLE daily_fb_ads ADD COLUMN udn_spend REAL NOT NULL DEFAULT 0.0")
+    if "live_spend" not in fb_cols:
+        cur.execute("ALTER TABLE daily_fb_ads ADD COLUMN live_spend REAL NOT NULL DEFAULT 0.0")
 
 
     # 5. Table: onedrive_closings

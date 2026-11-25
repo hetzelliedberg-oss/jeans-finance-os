@@ -280,6 +280,8 @@ def get_orders_list(
             conditions.append("source_channel IN ('korat', 'storefront_korat')")
         elif channel in ["udn", "storefront_udn", "udon"]:
             conditions.append("source_channel IN ('udn', 'storefront_udn', 'udon')")
+        elif channel in ["live", "live_fb", "order_live"]:
+            conditions.append("source_channel IN ('live', 'live_fb', 'order_live')")
         else:
             conditions.append("source_channel = ?")
             params.append(channel)
@@ -499,6 +501,8 @@ def telegram_sync_group(req: TelegramSyncRequest):
         ch = "korat"
     elif req.channel in ["udn", "storefront_udn", "udon"]:
         ch = "udn"
+    elif req.channel in ["live", "live_fb", "order_live"]:
+        ch = "live"
     else:
         ch = "online"
     res = telethon_manager.sync_group_history(req.chat_id, ch, req.since_date or "2026-08-01")

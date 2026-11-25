@@ -210,7 +210,8 @@ class TelethonManager:
                             "is_online_group": "ออนไลน์" in d.title or "office" in d.title.lower(),
                             "is_kkc_group": "ขอนแก่น" in d.title or "kkc" in d.title.lower(),
                             "is_korat_group": "โคราช" in d.title or "korat" in d.title.lower(),
-                            "is_udn_group": "อุดร" in d.title or "udn" in d.title.lower()
+                            "is_udn_group": "อุดร" in d.title or "udn" in d.title.lower(),
+                            "is_live_group": "ไลฟ" in d.title or "live" in d.title.lower() or getattr(d, "id", 0) in (-4576838432, 4576838432)
                         })
                 return results
             except Exception as e:
@@ -423,6 +424,8 @@ class TelethonManager:
                     channel = "korat"
                 elif "ขอนแก่น" in chat_title or "kkc" in chat_title.lower() or getattr(chat, "id", 0) in (-5366638194, 5366638194):
                     channel = "kkc"
+                elif "ไลฟ" in chat_title or "live" in chat_title.lower() or getattr(chat, "id", 0) in (-4576838432, 4576838432):
+                    channel = "live"
 
                 sender = await event.get_sender()
                 if _is_bot_message(sender, event.message):
@@ -496,7 +499,7 @@ class TelethonManager:
             start_utc = datetime.now(tz_th).replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc)
             sku_cost_map = get_sku_cost_map()
             
-            for ch_id, ch_name in [(-4242902075, "online"), (-5366638194, "kkc"), (-5260539289, "korat"), (-5325611582, "udn")]:
+            for ch_id, ch_name in [(-4242902075, "online"), (-4576838432, "live"), (-5366638194, "kkc"), (-5260539289, "korat"), (-5325611582, "udn")]:
                 try:
                     entity = await self.client.get_entity(ch_id)
                     live_msg_ids = set()

@@ -137,6 +137,10 @@
             <i data-lucide="globe" class="w-3.5 h-3.5"></i>
             <span>ออนไลน์ ออฟฟิต</span>
           </button>
+          <button onclick="setChannel('live')" id="ch-live" class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1">
+            <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span>ไลฟ์สด (Live)</span>
+          </button>
           <button onclick="setChannel('kkc')" id="ch-kkc" class="px-3 py-1 rounded-md font-medium text-slate-400 hover:text-white transition flex items-center gap-1">
             <i data-lucide="store" class="w-3.5 h-3.5"></i>
             <span>หน้าร้านเซนทรัล KKC</span>
@@ -836,6 +840,7 @@
             <option value="kkc">🏬 หน้าร้านเซนทรัล KKC</option>
             <option value="korat">🏬 หน้าร้านเซนทรัล โคราช</option>
             <option value="udn">🏬 หน้าร้านเซนทรัล อุดรธานี</option>
+            <option value="live">🔴 ไลฟ์สด (Live)</option>
           </select>
         </div>
         <div>
@@ -1340,7 +1345,7 @@ xrp55 2 ตัว
 
     function setChannel(ch) {
       currentChannel = ch;
-      ['online', 'kkc', 'korat', 'udn', 'consolidated'].forEach(c => {
+      ['online', 'live', 'kkc', 'korat', 'udn', 'consolidated'].forEach(c => {
         const btn = document.getElementById(`ch-${c}`);
         if (btn) {
           if (c === ch) {
@@ -1503,7 +1508,7 @@ xrp55 2 ตัว
       const end = document.getElementById("inputEndDate").value;
       updateActivePeriodBadge();
 
-      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : (currentChannel === 'udn' ? 'หน้าร้านเซนทรัล อุดรธานี' : 'งบรวมทั้งบริษัท')));
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'live' ? 'ไลฟ์สด (Live)' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : (currentChannel === 'udn' ? 'หน้าร้านเซนทรัล อุดรธานี' : 'งบรวมทั้งบริษัท'))));
       const subtitleEl = document.getElementById("pnlPeriodSubtitle");
       if (subtitleEl) {
         subtitleEl.innerText = `ช่วงวันที่ ${start} ถึง ${end} • ช่องทาง: ${channelLabel}`;
@@ -1704,7 +1709,7 @@ xrp55 2 ตัว
       if (!data) return;
       const start = document.getElementById("inputStartDate").value;
       const end = document.getElementById("inputEndDate").value;
-      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : (currentChannel === 'udn' ? 'หน้าร้านเซนทรัล อุดรธานี' : 'งบรวมทั้งบริษัท')));
+      const channelLabel = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'live' ? 'ไลฟ์สด (Live)' : (currentChannel === 'kkc' ? 'หน้าร้านเซนทรัล KKC' : (currentChannel === 'korat' ? 'หน้าร้านเซนทรัล โคราช' : (currentChannel === 'udn' ? 'หน้าร้านเซนทรัล อุดรธานี' : 'งบรวมทั้งบริษัท'))));
       const subEl = document.getElementById("adminsPeriodSubtitle");
       if (subEl) {
         if (start === end) {
@@ -1803,6 +1808,8 @@ xrp55 2 ตัว
             channelBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">🏬 โคราช</span>`;
           } else if (o.source_channel === "udn" || o.source_channel === "storefront_udn" || o.source_channel === "udon") {
             channelBadge = `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">🏬 อุดรธานี</span>`;
+          } else if (o.source_channel === "live" || o.source_channel === "live_fb" || o.source_channel === "order_live") {
+            channelBadge = `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold">🔴 ไลฟ์สด</span>`;
           } else if (o.source_channel === "kkc" || o.source_channel === "storefront_kkc") {
             channelBadge = `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30 font-semibold">🏬 ขอนแก่น</span>`;
           }
@@ -1955,7 +1962,7 @@ xrp55 2 ตัว
     // ---------------- MODAL 1: SCAN PASTED TEXT ---------------- //
     function openScanModal() {
       document.getElementById("scanDate").value = document.getElementById("inputStartDate").value;
-      document.getElementById("scanChannel").value = (currentChannel === 'kkc' || currentChannel === 'korat' || currentChannel === 'udn') ? currentChannel : 'online';
+      document.getElementById("scanChannel").value = (currentChannel === 'kkc' || currentChannel === 'korat' || currentChannel === 'udn' || currentChannel === 'live') ? currentChannel : 'online';
       document.getElementById("scanModal").classList.remove("hidden");
       document.getElementById("scanModal").classList.add("flex");
     }
@@ -2149,7 +2156,7 @@ xrp55 2 ตัว
       if (!recData) return;
       const subEl = document.getElementById("reconcileSubtitle");
       if (subEl) {
-        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : (currentChannel === 'korat' ? 'หน้าร้าน โคราช' : (currentChannel === 'udn' ? 'หน้าร้าน อุดรธานี' : 'งบรวม')));
+        const chName = currentChannel === 'online' ? 'ออนไลน์ ออฟฟิต' : (currentChannel === 'live' ? 'ไลฟ์สด (Live)' : (currentChannel === 'kkc' ? 'หน้าร้าน KKC' : (currentChannel === 'korat' ? 'หน้าร้าน โคราช' : (currentChannel === 'udn' ? 'หน้าร้าน อุดรธานี' : 'งบรวม'))));
         subEl.innerText = `เปรียบเทียบยอดขายรายวันระหว่างฐานข้อมูลแชทกับไฟล์ปิดวัน OneDrive • ช่วง: ${recData.date_range.start} ถึง ${recData.date_range.end} • ช่องทาง: ${chName}`;
       }
 
