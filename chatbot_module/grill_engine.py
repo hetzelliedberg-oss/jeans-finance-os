@@ -803,13 +803,13 @@ def grill_conversation(
         )
         if (
             messages
-            and messages[-1].get("sender_role") in ("admin", "bot")
+            and messages[-1].get("sender_role") == "bot"
             and not is_auto_ad_greeting_text(last_m_txt, prev_m_txt)
             and not is_comment_auto
         ):
             return {
                 "decision": "BLOCK",
-                "reason": "Last message is already from admin/bot (already replied)",
+                "reason": "Last message is already from bot (already replied)",
                 "branch": branch,
                 "intent": intent,
                 "already_covered": covered,

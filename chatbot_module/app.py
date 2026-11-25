@@ -582,12 +582,13 @@ async def poller_loop() -> None:
                     ex_st = existing.get("status")
                     ex_now = datetime.now(timezone.utc)
                     ex_cust_dt = parse_iso_dt(existing.get("last_customer_msg_at"))
+                    ex_bot_dt = parse_iso_dt(existing.get("last_bot_msg_at"))
                     ex_adm_dt = parse_iso_dt(existing.get("last_admin_msg_at"))
-                    # 1) If customer replied after admin and > 60s passed with no admin reply -> fall through so AI answers!
-                    if ex_st == "ADMIN_REPLIED" and ex_cust_dt and (not ex_adm_dt or ex_cust_dt > ex_adm_dt) and (ex_now - ex_cust_dt).total_seconds() >= 60 and (ex_now - ex_cust_dt).total_seconds() <= 14400:
+                    # 1) ALWAYS-ON AI: if customer messaged in last 30m and BOT hasn't replied yet -> fall through immediately (NEVER yield to admin!)
+                    if ex_st not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL") and ex_cust_dt and (not ex_bot_dt or ex_cust_dt > ex_bot_dt) and (ex_now - ex_cust_dt).total_seconds() <= 1800:
                         pass
-                    # 2) If admin replied > 10m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
-                    elif ex_st == "ADMIN_REPLIED" and ex_adm_dt and ex_cust_dt and (ex_now - ex_adm_dt).total_seconds() > 600 and (ex_now - ex_cust_dt).total_seconds() <= 82800:
+                    # 2) If admin replied > 5m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
+                    elif ex_st == "ADMIN_REPLIED" and ex_adm_dt and ex_cust_dt and (ex_now - ex_adm_dt).total_seconds() > 300 and (ex_now - ex_cust_dt).total_seconds() <= 82800:
                         upsert_conversation({
                             "psid": psid,
                             "status": "WAITING_REPLY",
@@ -766,35 +767,27 @@ async def poller_loop() -> None:
                 is_recent_msg = bool(cust_dt and cust_age_sec <= 14400)
                 # Allow answering unanswered messages from up to 4h ago even across Render restarts
                 is_after_boot = bool(cust_dt and (cust_dt >= (BOT_STARTED_AT - timedelta(seconds=120)) or cust_age_sec <= 14400))
-                unanswered_by_bot = bool(
-                    last_role == "customer"
-                    and is_recent_msg
-                    and is_after_boot
-                    and (not last_bot_dt or (cust_dt and cust_dt > last_bot_dt))
+                # ALWAYS-ON AI: answer every customer message the bot hasn't replied to yet — NEVER yield to human admin!
+                bot_needs_reply = bool(
+                    last_role != "bot"
+                    and cust_dt
+                    and (not last_bot_dt or cust_dt > last_bot_dt)
+                    and (new_customer_msg or cust_age_sec <= 1800)
                 )
                 admin_dt = parse_iso_dt(last_human_admin_at)
                 admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
-                admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 60)
                 bill_dt = parse_iso_dt(last_bill_at)
                 admin_billed_active = bool(bill_dt and (now_utc - bill_dt).total_seconds() <= 82800 and not ad_click_after_bill)
                 recover_unanswered = bool(
-                    unanswered_by_bot
+                    bot_needs_reply
                     and (not existing or existing.get("status") not in ("BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL"))
                 )
-                if admin_billed_active and last_role == "admin":
+                if admin_billed_active and not new_customer_msg:
                     upsert_data["status"] = "WON"
                     upsert_data["next_followup_at"] = None
-                elif admin_active_recent and last_role == "admin":
-                    # Human admin just replied within 5m -> silence bot & cancel auto follow-ups
-                    if not (existing and existing.get("status") in ("WON", "BLACKLISTED")):
-                        upsert_data["status"] = "ADMIN_REPLIED"
-                        upsert_data["next_followup_at"] = None
-                elif last_role == "customer" and (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
+                elif (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
                     if admin_billed_active:
                         upsert_data["status"] = "WON"
-                        upsert_data["next_followup_at"] = None
-                    elif admin_active_recent or (existing and existing.get("status") == "ADMIN_REPLIED" and admin_dt and (now_utc - admin_dt).total_seconds() <= 60):
-                        upsert_data["status"] = "ADMIN_REPLIED"
                         upsert_data["next_followup_at"] = None
                     else:
                         upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
@@ -802,9 +795,7 @@ async def poller_loop() -> None:
                         upsert_data["next_followup_at"] = None
                 elif last_role == "admin" and (not existing or new_human_admin_msg or existing.get("status") in ("OPEN", "ADMIN_REPLIED", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
                     if not (existing and existing.get("status") in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY")):
-                        # If admin replied > 10m ago and customer is still silent & unbilled inside 23h window -> arm 8-Step Follow-up!
-                        admin_idle_sec = (now_utc - admin_dt).total_seconds() if admin_dt else 999999
-                        if (not admin_billed_active) and admin_idle_sec > 600 and cust_dt and cust_age_sec <= 82800:
+                        if (not admin_billed_active) and cust_dt and cust_age_sec <= 82800:
                             upsert_data["status"] = "WAITING_REPLY"
                             upsert_data["next_followup_at"] = (existing or {}).get("next_followup_at") or _compute_next_followup_iso(int((existing or {}).get("followup_stage") or 0))
                         else:
@@ -819,9 +810,9 @@ async def poller_loop() -> None:
                 upsert_conversation(upsert_data)
                 asyncio.create_task(asyncio.to_thread(_check_fraud_and_deletions, psid, cust_name, upsert_data["branch"], raw_msgs))
 
-                # Fire AI instant reply FIRST (non-blocking) so bot ALWAYS beats human admins in ~1-2s!
+                # Fire AI instant reply FIRST (non-blocking) on EVERY customer message — never yields to human admin!
                 is_turn_locked = bool(_psid_locks.get(psid) and _psid_locks[psid].locked())
-                if auto_pilot and last_role == "customer" and is_recent_msg and is_after_boot and not is_turn_locked:
+                if auto_pilot and bot_needs_reply and is_recent_msg and is_after_boot and not is_turn_locked:
                     conv_now = get_conversation(psid)
                     if conv_now and (conv_now.get("status") == "OPEN" or (conv_now.get("status") == "WON" and new_customer_msg)):
                         asyncio.create_task(process_customer_turn(psid, trigger_type="INSTANT_REPLY"))
