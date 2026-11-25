@@ -1500,7 +1500,7 @@ def generate_3enter_reply(
             if time.time() < globals().get("_GEMINI_429_UNTIL", 0.0):
                 cand_models = []
             else:
-                cand_models = dict.fromkeys(["gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest", "gemini-2.5-flash", model_name])
+                cand_models = dict.fromkeys([model_name, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"])
             for cand_model in cand_models:
                 try:
                     gen_cfg = types.GenerateContentConfig(

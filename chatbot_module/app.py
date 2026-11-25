@@ -913,7 +913,7 @@ async def followup_loop() -> None:
                 now_dt = datetime.now(timezone.utc)
                 with get_conn() as conn:
                     rows = conn.execute(
-                        "SELECT psid, next_followup_at FROM conversations WHERE status IN ('WAITING_REPLY') AND next_followup_at IS NOT NULL"
+                        "SELECT psid, next_followup_at, last_customer_msg_at FROM conversations WHERE status IN ('WAITING_REPLY') AND next_followup_at IS NOT NULL"
                     ).fetchall()
                     sla_rows = conn.execute(
                         "SELECT psid, customer_name, branch, ad_name, status, last_customer_msg_at FROM conversations WHERE status IN ('HANDOFF', 'HANDOFF_ALERTED', 'OPEN') AND last_customer_msg_at IS NOT NULL"
@@ -941,10 +941,19 @@ async def followup_loop() -> None:
                                 ur["ad_name"] or "",
                                 0,
                             )
+                bkk_now = datetime.now(BKK_TZ)
+                is_late_night = (bkk_now.hour == 23 and bkk_now.minute >= 30) or (bkk_now.hour < 7) or (bkk_now.hour == 7 and bkk_now.minute < 30)
                 for r in rows:
                     due_dt = parse_iso_dt(r["next_followup_at"])
                     if due_dt and due_dt <= now_dt:
+                        if is_late_night:
+                            # Context-aware late-night rule: if customer is actively chatting (<= 30m ago), keep replying;
+                            # if customer has been silent > 30m at night, wait until morning so we never wake sleeping customers!
+                            lc_dt = parse_iso_dt(r["last_customer_msg_at"])
+                            if not lc_dt or (now_dt - lc_dt).total_seconds() > 1800:
+                                continue
                         await process_customer_turn(r["psid"], trigger_type="FOLLOWUP")
+                        await asyncio.sleep(2.5)
                 if get_bool_setting("sla_nag_enabled", True):
                     for sr in sla_rows:
                         cust_dt = parse_iso_dt(sr["last_customer_msg_at"])
