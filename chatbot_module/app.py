@@ -78,6 +78,10 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
     async with lock:
         conv = get_conversation(psid) or {"psid": psid, "customer_name": "ลูกค้า"}
         messages = get_messages(psid, limit=30)
+        last_cust_msg = next(
+            (m.get("text", "") for m in reversed(messages) if m.get("sender_role") == "customer"),
+            "",
+        )
         settings = get_settings()
         max_fup = int(settings.get("max_auto_followups", "8") or "8")
         is_followup = trigger_type == "FOLLOWUP"
@@ -89,6 +93,7 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
             conv_meta=conv,
             is_followup=is_followup,
             max_followups=max_fup,
+            trigger_type=trigger_type,
         )
         decision = grill["decision"]
         branch = grill.get("branch", conv.get("branch", "ONLINE"))
@@ -552,7 +557,7 @@ async def poller_loop() -> None:
             if _poll_cycle == 1 or (_poll_cycle % 10 == 0):
                 convs = await asyncio.to_thread(meta_client.fetch_conversations, 25, 15)
             else:
-                convs = await asyncio.to_thread(meta_client.fetch_conversations, 15, 10)
+                convs = await asyncio.to_thread(meta_client.fetch_conversations, 8, 8)
             ad_rows = list_ad_knowledge()
             for c in convs:
                 participants = (c.get("participants") or {}).get("data", [])
@@ -571,10 +576,25 @@ async def poller_loop() -> None:
                 latest_raw_mid = raw_msgs[-1].get("id")
                 unread_cnt = c.get("unread_count")
                 if existing and existing.get("last_msg_id") == latest_raw_mid:
-                    # If admin already opened & read the chat in Meta Inbox (unread_count == 0) -> silence SLA nags
-                    if unread_cnt == 0 and existing.get("status") in ("HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL", "OPEN"):
+                    # If admin already opened & read a HANDOFF chat in Meta Inbox (unread_count == 0) -> silence SLA nags only (never kill OPEN bot replies)
+                    if unread_cnt == 0 and existing.get("status") in ("HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL"):
                         upsert_conversation({"psid": psid, "status": "ADMIN_REPLIED"})
-                    if existing.get("status") not in ("OPEN",) or unread_cnt == 0:
+                    ex_st = existing.get("status")
+                    ex_now = datetime.now(timezone.utc)
+                    ex_cust_dt = parse_iso_dt(existing.get("last_customer_msg_at"))
+                    ex_adm_dt = parse_iso_dt(existing.get("last_admin_msg_at"))
+                    # 1) If customer replied after admin and > 60s passed with no admin reply -> fall through so AI answers!
+                    if ex_st == "ADMIN_REPLIED" and ex_cust_dt and (not ex_adm_dt or ex_cust_dt > ex_adm_dt) and (ex_now - ex_cust_dt).total_seconds() >= 60 and (ex_now - ex_cust_dt).total_seconds() <= 14400:
+                        pass
+                    # 2) If admin replied > 10m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
+                    elif ex_st == "ADMIN_REPLIED" and ex_adm_dt and ex_cust_dt and (ex_now - ex_adm_dt).total_seconds() > 600 and (ex_now - ex_cust_dt).total_seconds() <= 82800:
+                        upsert_conversation({
+                            "psid": psid,
+                            "status": "WAITING_REPLY",
+                            "next_followup_at": existing.get("next_followup_at") or _compute_next_followup_iso(int(existing.get("followup_stage") or 0)),
+                        })
+                        continue
+                    elif ex_st != "OPEN":
                         continue
 
                 new_customer_msg = False
@@ -754,7 +774,7 @@ async def poller_loop() -> None:
                 )
                 admin_dt = parse_iso_dt(last_human_admin_at)
                 admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
-                admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 300)
+                admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 60)
                 bill_dt = parse_iso_dt(last_bill_at)
                 admin_billed_active = bool(bill_dt and (now_utc - bill_dt).total_seconds() <= 82800 and not ad_click_after_bill)
                 recover_unanswered = bool(
@@ -773,8 +793,10 @@ async def poller_loop() -> None:
                     if admin_billed_active:
                         upsert_data["status"] = "WON"
                         upsert_data["next_followup_at"] = None
+                    elif admin_active_recent or (existing and existing.get("status") == "ADMIN_REPLIED" and admin_dt and (now_utc - admin_dt).total_seconds() <= 60):
+                        upsert_data["status"] = "ADMIN_REPLIED"
+                        upsert_data["next_followup_at"] = None
                     else:
-                        # Customer sent a NEW unanswered message -> ALWAYS reply immediately in ~1-2s (never silence 5m!)
                         upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
                         upsert_data["followup_stage"] = 0
                         upsert_data["next_followup_at"] = None
@@ -808,7 +830,8 @@ async def poller_loop() -> None:
                     cb_dt = parse_iso_dt(cb_at)
                     if cb_dt and (datetime.now(timezone.utc) - cb_dt).total_seconds() <= 900:
                         quoted = cb_text.splitlines()[0].strip(' "“”') or cb_text[:120]
-                        save_message(f"cb_quote_{cb_mid}", psid, "customer", quoted, cb_at)
+                        cb_quote_at = (cb_dt + timedelta(seconds=1)).isoformat()
+                        save_message(f"cb_quote_{cb_mid}", psid, "customer", quoted, cb_quote_at)
                         upsert_conversation({"psid": psid, "status": "OPEN", "followup_stage": 0})
                         asyncio.create_task(process_customer_turn(psid, trigger_type="COMMENT_BOT_FOLLOWUP"))
 

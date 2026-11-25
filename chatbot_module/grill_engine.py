@@ -330,6 +330,7 @@ def grill_conversation(
     conv_meta: Optional[Dict[str, Any]] = None,
     is_followup: bool = False,
     max_followups: int = 8,
+    trigger_type: str = "INSTANT_REPLY",
 ) -> Dict[str, Any]:
     """
     Evaluate whether it is safe, helpful, and non-annoying to send a 3-Enter reply.
@@ -449,6 +450,7 @@ def grill_conversation(
         if hours_since > 23.5:
             return {
                 "decision": "BLOCK",
+                "end_conversation": True,
                 "reason": f"Outside 24h Meta window ({hours_since:.1f}h since last customer msg)",
                 "branch": branch,
                 "intent": intent,
@@ -790,13 +792,20 @@ def grill_conversation(
                 "already_covered": covered,
             }
     else:
-        # Instant reply: check if last message in thread is already from admin/bot (ignoring auto Ad-reply greetings)
+        # Instant reply: check if last message in thread is already from admin/bot (ignoring auto Ad-reply / comment-bot greetings)
         last_m_txt = (messages[-1].get("text") or "") if messages else ""
         prev_m_txt = (messages[-2].get("text") or "") if len(messages) >= 2 else ""
+        is_comment_auto = (
+            "คุณลูกค้าแจ้งรอบเอว" in last_m_txt
+            or "กำลังตอบกลับความคิดเห็น" in last_m_txt
+            or "สวัสดีค่า เห็นพี่เม้นมา" in last_m_txt
+            or last_m_txt.strip().startswith(('"', '“'))
+        )
         if (
             messages
             and messages[-1].get("sender_role") in ("admin", "bot")
             and not is_auto_ad_greeting_text(last_m_txt, prev_m_txt)
+            and not is_comment_auto
         ):
             return {
                 "decision": "BLOCK",
