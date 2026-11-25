@@ -853,6 +853,18 @@ if os.path.isdir(_chatbot_dir):
 
         _cb_bg_tasks = []
 
+        async def _self_keepalive_loop():
+            """Ping public Render HTTPS URL every 8m so Render Free Tier never idles out even when Local PC is off."""
+            import urllib.request as _ureq
+            _pub = (os.getenv("RENDER_EXTERNAL_URL") or "https://jeans-finance-os-gma9.onrender.com").rstrip("/")
+            await _asyncio.sleep(60)
+            while True:
+                try:
+                    await _asyncio.to_thread(lambda: _ureq.urlopen(f"{_pub}/api/health", timeout=15).read())
+                except Exception:
+                    pass
+                await _asyncio.sleep(480)
+
         @app.on_event("startup")
         async def _start_chatbot_workers():
             _cb_mod.init_db()
@@ -863,9 +875,10 @@ if os.path.isdir(_chatbot_dir):
                 _cb_mod.learner_loop,
                 _cb_mod.self_grill_loop,
                 _cb_mod.ads_monitor_loop,
+                _self_keepalive_loop,
             ]:
                 _cb_bg_tasks.append(_asyncio.create_task(_fn()))
-            print("[Unified] ✅ AI Chatbot + Ads Monitor + Telegram Notify started at /chatbot & /webhook", flush=True)
+            print("[Unified] ✅ AI Chatbot + Ads Monitor + Telegram Notify + 24/7 Self-Keepalive started at /chatbot & /webhook", flush=True)
 
         @app.on_event("shutdown")
         async def _stop_chatbot_workers():
