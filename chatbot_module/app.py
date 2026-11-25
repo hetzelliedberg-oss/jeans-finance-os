@@ -552,7 +552,7 @@ async def poller_loop() -> None:
             if _poll_cycle == 1 or (_poll_cycle % 10 == 0):
                 convs = await asyncio.to_thread(meta_client.fetch_conversations, 25, 15)
             else:
-                convs = await asyncio.to_thread(meta_client.fetch_conversations, 8, 8)
+                convs = await asyncio.to_thread(meta_client.fetch_conversations, 15, 10)
             ad_rows = list_ad_knowledge()
             for c in convs:
                 participants = (c.get("participants") or {}).get("data", [])
@@ -773,10 +773,8 @@ async def poller_loop() -> None:
                     if admin_billed_active:
                         upsert_data["status"] = "WON"
                         upsert_data["next_followup_at"] = None
-                    elif admin_active_recent or (existing and existing.get("status") == "ADMIN_REPLIED" and admin_dt and (now_utc - admin_dt).total_seconds() <= 300):
-                        upsert_data["status"] = "ADMIN_REPLIED"
-                        upsert_data["next_followup_at"] = None
                     else:
+                        # Customer sent a NEW unanswered message -> ALWAYS reply immediately in ~1-2s (never silence 5m!)
                         upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"
                         upsert_data["followup_stage"] = 0
                         upsert_data["next_followup_at"] = None
