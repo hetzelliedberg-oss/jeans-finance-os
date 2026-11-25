@@ -738,39 +738,14 @@ def grill_conversation(
                 "intent": intent,
                 "already_covered": covered,
             }
-        if conv_meta.get("status") in ("ADMIN_REPLIED", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL", "HANDOFF_UNREACHABLE", "WON", "CLOSED_GRACEFULLY"):
+        if conv_meta.get("status") in ("HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL", "HANDOFF_UNREACHABLE", "WON", "CLOSED_GRACEFULLY"):
             return {
                 "decision": "BLOCK",
-                "reason": f"Human admin active or thread closed (status={conv_meta.get('status')})",
+                "reason": f"Thread handed off or closed (status={conv_meta.get('status')})",
                 "branch": branch,
                 "intent": intent,
                 "already_covered": covered,
             }
-        # Never fire auto follow-up if a human admin already sent the latest reply in the active thread
-        last_human_or_cust = next(
-            (
-                m for idx in range(len(active_msgs) - 1, -1, -1)
-                for m in (active_msgs[idx],)
-                if m.get("sender_role") in ("admin", "customer")
-                and not is_auto_ad_greeting_text(
-                    m.get("text") or "",
-                    active_msgs[idx - 1].get("text") or "" if idx > 0 else "",
-                )
-                and not any(mk in (m.get("text") or "") for mk in SYSTEM_ORDER_MARKERS)
-            ),
-            None,
-        )
-        if last_human_or_cust and last_human_or_cust.get("sender_role") == "admin":
-            last_adm_dt = parse_iso_dt(last_human_or_cust.get("created_at"))
-            adm_age_sec = (datetime.now(timezone.utc) - last_adm_dt).total_seconds() if last_adm_dt else 0
-            if adm_age_sec <= 600:
-                return {
-                    "decision": "BLOCK",
-                    "reason": "Human admin replied within 10m -> Wait before auto follow-up",
-                    "branch": branch,
-                    "intent": intent,
-                    "already_covered": covered,
-                }
         stage = int(conv_meta.get("followup_stage") or 0)
         soft_pause_cues = ["ยังไม่รีบ", "ยังไม่รีบร้อน", "รอเงิน", "ขอตัดสินใจ", "เดี๋ยวแวะ", "วันหลัง", "มีโอกาสจะแวะ", "กลับโคราช", "ใส่ไม่ได้", "ไว้โอกาสหน้า"]
         if stage >= 1 and any(k in all_cust_text for k in soft_pause_cues):
@@ -792,24 +767,11 @@ def grill_conversation(
                 "already_covered": covered,
             }
     else:
-        # Instant reply: check if last message in thread is already from admin/bot (ignoring auto Ad-reply / comment-bot greetings)
-        last_m_txt = (messages[-1].get("text") or "") if messages else ""
-        prev_m_txt = (messages[-2].get("text") or "") if len(messages) >= 2 else ""
-        is_comment_auto = (
-            "คุณลูกค้าแจ้งรอบเอว" in last_m_txt
-            or "กำลังตอบกลับความคิดเห็น" in last_m_txt
-            or "สวัสดีค่า เห็นพี่เม้นมา" in last_m_txt
-            or last_m_txt.strip().startswith(('"', '“'))
-        )
-        if (
-            messages
-            and messages[-1].get("sender_role") == "bot"
-            and not is_auto_ad_greeting_text(last_m_txt, prev_m_txt)
-            and not is_comment_auto
-        ):
+        # Instant reply: NEVER hide from human admins — only block if the BOT itself already sent the latest message
+        if messages and messages[-1].get("sender_role") == "bot":
             return {
                 "decision": "BLOCK",
-                "reason": "Last message is already from bot (already replied)",
+                "reason": "Last message is already from bot (prevent duplicate loop)",
                 "branch": branch,
                 "intent": intent,
                 "already_covered": covered,

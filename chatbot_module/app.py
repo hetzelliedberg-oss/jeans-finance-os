@@ -1173,9 +1173,7 @@ async def receive_webhook(request: Request):
                     continue
                 save_message(mid, sender_id, "customer", text, created_at)
                 existing_wh = get_conversation(sender_id)
-                adm_dt = parse_iso_dt((existing_wh or {}).get("last_admin_msg_at"))
-                adm_5m = bool(adm_dt and (datetime.now(timezone.utc) - adm_dt).total_seconds() <= 300)
-                if existing_wh and existing_wh.get("status") in ("ADMIN_REPLIED", "WON") and (existing_wh.get("status") == "WON" or adm_5m):
+                if existing_wh and existing_wh.get("status") == "WON":
                     upsert_conversation({"psid": sender_id, "last_customer_msg_at": created_at})
                     continue
                 upsert_conversation(
