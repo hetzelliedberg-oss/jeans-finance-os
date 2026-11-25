@@ -584,7 +584,9 @@ async def poller_loop() -> None:
                 last_human_admin_at = None
                 last_real_role = "customer"
                 prev_raw_text = ""
-                bot_mids = {(m.get("msg_id") or m.get("mid")) for m in get_messages(psid, limit=40) if m.get("sender_role") == "bot"}
+                _db_bot_msgs = [m for m in get_messages(psid, limit=40) if m.get("sender_role") == "bot"]
+                bot_mids = {(m.get("msg_id") or m.get("mid")) for m in _db_bot_msgs}
+                bot_texts = {(m.get("text") or "").strip() for m in _db_bot_msgs if (m.get("text") or "").strip()}
 
                 for m in raw_msgs:
                     mid = m.get("id")
@@ -621,7 +623,7 @@ async def poller_loop() -> None:
                         or "กำลังตอบกลับความคิดเห็น" in text
                     )
                     is_auto_ad_greeting = is_auto_ad_greeting_text(text, prev_raw_text)
-                    is_bot_sent = (mid in bot_mids) or _is_bot_style_msg(text)
+                    is_bot_sent = (mid in bot_mids) or (text.strip() in bot_texts) or _is_bot_style_msg(text)
                     prev_raw_text = text
 
                     if role == "customer":
