@@ -587,6 +587,7 @@ async def poller_loop() -> None:
                 last_human_admin_at = None
                 last_real_role = "customer"
                 prev_raw_text = ""
+                last_ad_click_dt = None
                 _db_bot_msgs = [m for m in get_messages(psid, limit=40) if m.get("sender_role") == "bot"]
                 bot_mids = {(m.get("msg_id") or m.get("mid")) for m in _db_bot_msgs}
                 bot_texts = {(m.get("text") or "").strip() for m in _db_bot_msgs if (m.get("text") or "").strip()}
@@ -625,9 +626,14 @@ async def poller_loop() -> None:
                         or "สวัสดีค่า เห็นพี่เม้นมา" in text
                         or "กำลังตอบกลับความคิดเห็น" in text
                     )
-                    is_auto_ad_greeting = is_auto_ad_greeting_text(text, prev_raw_text)
+                    cur_m_dt = parse_iso_dt(created_at)
+                    if "ตอบกลับโฆษณา" in text and cur_m_dt:
+                        last_ad_click_dt = cur_m_dt
+                    within_ad_burst = bool(role == "admin" and last_ad_click_dt and cur_m_dt and 0 <= (cur_m_dt - last_ad_click_dt).total_seconds() <= 10)
+                    is_auto_ad_greeting = within_ad_burst or is_auto_ad_greeting_text(text, prev_raw_text)
                     is_bot_sent = (mid in bot_mids) or (text.strip() in bot_texts) or _is_bot_style_msg(text)
-                    prev_raw_text = text
+                    if text != "[ADMIN_SENT_IMAGE]":
+                        prev_raw_text = text
 
                     if role == "customer":
                         last_cust_at = created_at
