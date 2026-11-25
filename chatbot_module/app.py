@@ -542,14 +542,17 @@ def _check_fraud_and_deletions(psid: str, cust_name: str, branch: str, raw_msgs:
 
 
 async def poller_loop() -> None:
-    """24/7 Cloud Poller: catches new Page messages even if Webhook is not yet subscribed."""
+    """24/7 Turbo Cloud Poller: 1-second fast poll (top 8 chats) + deep 25-chat sync every 10th cycle so AI beats human admins."""
     await asyncio.sleep(2)
+    _poll_cycle = 0
     while True:
         try:
             auto_pilot = get_bool_setting("auto_pilot_enabled", False)
-            poll_sec = int(get_settings().get("poll_interval_sec", "3") or "3")
-
-            convs = await asyncio.to_thread(meta_client.fetch_conversations, 25, 15)
+            _poll_cycle += 1
+            if _poll_cycle == 1 or (_poll_cycle % 10 == 0):
+                convs = await asyncio.to_thread(meta_client.fetch_conversations, 25, 15)
+            else:
+                convs = await asyncio.to_thread(meta_client.fetch_conversations, 8, 8)
             ad_rows = list_ad_knowledge()
             for c in convs:
                 participants = (c.get("participants") or {}).get("data", [])
@@ -790,6 +793,21 @@ async def poller_loop() -> None:
                 upsert_conversation(upsert_data)
                 asyncio.create_task(asyncio.to_thread(_check_fraud_and_deletions, psid, cust_name, upsert_data["branch"], raw_msgs))
 
+                # Fire AI instant reply FIRST (non-blocking) so bot ALWAYS beats human admins in ~1-2s!
+                is_turn_locked = bool(_psid_locks.get(psid) and _psid_locks[psid].locked())
+                if auto_pilot and last_role == "customer" and is_recent_msg and is_after_boot and not is_turn_locked:
+                    conv_now = get_conversation(psid)
+                    if conv_now and (conv_now.get("status") == "OPEN" or (conv_now.get("status") == "WON" and new_customer_msg)):
+                        asyncio.create_task(process_customer_turn(psid, trigger_type="INSTANT_REPLY"))
+                elif auto_pilot and last_role == "admin" and new_comment_bot_msg and not is_turn_locked:
+                    cb_mid, cb_text, cb_at = new_comment_bot_msg
+                    cb_dt = parse_iso_dt(cb_at)
+                    if cb_dt and (datetime.now(timezone.utc) - cb_dt).total_seconds() <= 900:
+                        quoted = cb_text.splitlines()[0].strip(' "“”') or cb_text[:120]
+                        save_message(f"cb_quote_{cb_mid}", psid, "customer", quoted, cb_at)
+                        upsert_conversation({"psid": psid, "status": "OPEN", "followup_stage": 0})
+                        asyncio.create_task(process_customer_turn(psid, trigger_type="COMMENT_BOT_FOLLOWUP"))
+
                 if (
                     new_customer_msg
                     and last_role == "customer"
@@ -805,7 +823,7 @@ async def poller_loop() -> None:
                             ((rm.get("message") or "").strip() for rm in reversed(raw_msgs) if (rm.get("from") or {}).get("id") != meta_client.page_id and (rm.get("message") or "").strip()),
                             "[ส่งรูปภาพ]",
                         )
-                        await asyncio.to_thread(
+                        asyncio.create_task(asyncio.to_thread(
                             notify_admins_boss_mode,
                             upsert_data["branch"],
                             cust_name,
@@ -816,23 +834,9 @@ async def poller_loop() -> None:
                             "NEW_CONV" if not existing else "EXISTING_CONV",
                             eff_ad_name or "",
                             0,
-                        )
+                        ))
 
-                is_turn_locked = bool(_psid_locks.get(psid) and _psid_locks[psid].locked())
-                if auto_pilot and last_role == "customer" and is_recent_msg and is_after_boot and not is_turn_locked:
-                    conv_now = get_conversation(psid)
-                    if conv_now and (conv_now.get("status") == "OPEN" or (conv_now.get("status") == "WON" and new_customer_msg)):
-                        asyncio.create_task(process_customer_turn(psid, trigger_type="INSTANT_REPLY"))
-                elif auto_pilot and last_role == "admin" and new_comment_bot_msg and not is_turn_locked:
-                    cb_mid, cb_text, cb_at = new_comment_bot_msg
-                    cb_dt = parse_iso_dt(cb_at)
-                    if cb_dt and (datetime.now(timezone.utc) - cb_dt).total_seconds() <= 900:
-                        quoted = cb_text.splitlines()[0].strip(' "“”') or cb_text[:120]
-                        save_message(f"cb_quote_{cb_mid}", psid, "customer", quoted, cb_at)
-                        upsert_conversation({"psid": psid, "status": "OPEN", "followup_stage": 0})
-                        asyncio.create_task(process_customer_turn(psid, trigger_type="COMMENT_BOT_FOLLOWUP"))
-
-            await asyncio.sleep(max(2, poll_sec))
+            await asyncio.sleep(1)
         except Exception as e:
             print(f"[PollerLoop] Error: {e}")
             await asyncio.sleep(30)
