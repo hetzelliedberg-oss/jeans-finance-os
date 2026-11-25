@@ -753,13 +753,16 @@ def grill_conversation(
             None,
         )
         if last_human_or_cust and last_human_or_cust.get("sender_role") == "admin":
-            return {
-                "decision": "BLOCK",
-                "reason": "Human admin already replied last -> Stop auto follow-up to avoid contradicting admin",
-                "branch": branch,
-                "intent": intent,
-                "already_covered": covered,
-            }
+            last_adm_dt = parse_iso_dt(last_human_or_cust.get("created_at"))
+            adm_age_sec = (datetime.now(timezone.utc) - last_adm_dt).total_seconds() if last_adm_dt else 0
+            if adm_age_sec <= 600:
+                return {
+                    "decision": "BLOCK",
+                    "reason": "Human admin replied within 10m -> Wait before auto follow-up",
+                    "branch": branch,
+                    "intent": intent,
+                    "already_covered": covered,
+                }
         stage = int(conv_meta.get("followup_stage") or 0)
         soft_pause_cues = ["ยังไม่รีบ", "ยังไม่รีบร้อน", "รอเงิน", "ขอตัดสินใจ", "เดี๋ยวแวะ", "วันหลัง", "มีโอกาสจะแวะ", "กลับโคราช", "ใส่ไม่ได้", "ไว้โอกาสหน้า"]
         if stage >= 1 and any(k in all_cust_text for k in soft_pause_cues):
