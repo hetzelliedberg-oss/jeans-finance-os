@@ -549,7 +549,7 @@ async def poller_loop() -> None:
             auto_pilot = get_bool_setting("auto_pilot_enabled", False)
             poll_sec = int(get_settings().get("poll_interval_sec", "3") or "3")
 
-            convs = await asyncio.to_thread(meta_client.fetch_conversations, 12, 15)
+            convs = await asyncio.to_thread(meta_client.fetch_conversations, 25, 15)
             ad_rows = list_ad_knowledge()
             for c in convs:
                 participants = (c.get("participants") or {}).get("data", [])
@@ -745,7 +745,7 @@ async def poller_loop() -> None:
                 admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
                 admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 300)
                 bill_dt = parse_iso_dt(last_bill_at)
-                admin_billed_active = bool(bill_dt and (now_utc - bill_dt).total_seconds() <= 3600 and not ad_click_after_bill)
+                admin_billed_active = bool(bill_dt and (now_utc - bill_dt).total_seconds() <= 82800 and not ad_click_after_bill)
                 recover_unanswered = bool(
                     unanswered_by_bot
                     and (not existing or existing.get("status") not in ("BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL"))
@@ -758,7 +758,7 @@ async def poller_loop() -> None:
                     if not (existing and existing.get("status") in ("WON", "BLACKLISTED")):
                         upsert_data["status"] = "ADMIN_REPLIED"
                         upsert_data["next_followup_at"] = None
-                elif (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
+                elif last_role == "customer" and (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
                     if admin_billed_active:
                         upsert_data["status"] = "WON"
                         upsert_data["next_followup_at"] = None
@@ -773,13 +773,13 @@ async def poller_loop() -> None:
                     if not (existing and existing.get("status") in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY")):
                         # If admin replied > 10m ago and customer is still silent & unbilled inside 23h window -> arm 8-Step Follow-up!
                         admin_idle_sec = (now_utc - admin_dt).total_seconds() if admin_dt else 999999
-                        if (not admin_billed_active) and (not new_human_admin_msg) and admin_idle_sec > 600 and cust_dt and cust_age_sec <= 82800:
+                        if (not admin_billed_active) and admin_idle_sec > 600 and cust_dt and cust_age_sec <= 82800:
                             upsert_data["status"] = "WAITING_REPLY"
                             upsert_data["next_followup_at"] = (existing or {}).get("next_followup_at") or _compute_next_followup_iso(int((existing or {}).get("followup_stage") or 0))
                         else:
                             upsert_data["status"] = "ADMIN_REPLIED"
                             upsert_data["next_followup_at"] = None
-                elif last_role == "bot" and (not existing or not (existing.get("next_followup_at"))):
+                elif last_role == "bot" and (not existing or existing.get("status") == "OPEN" or not (existing.get("next_followup_at"))):
                     # Survive Render ephemeral DB restarts: re-arm 8-Step Follow-up for unclosed bot-replied chats inside 23h window!
                     if (not admin_billed_active) and cust_dt and cust_age_sec <= 82800 and (not existing or existing.get("status") not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")):
                         upsert_data["status"] = "WAITING_REPLY"
