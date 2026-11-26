@@ -142,10 +142,10 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
                 closed = await asyncio.to_thread(
                     close_and_record_order, psid, conv.get("customer_name", "ลูกค้า"), synthetic_msgs, branch, conv.get("ad_name") or "", dry_run
                 )
-                await meta_client.send_3enter_sequence(psid, closed["confirm_bubbles"], dry_run=dry_run)
+                # Silent handoff on slip/address photo -> let human admin verify slip & bill (never send auto-summed bill!)
                 upsert_conversation({"psid": psid, "branch": branch, "status": "WON", "next_followup_at": None})
-                log_grill(psid, conv.get("customer_name", "ลูกค้า"), trigger_type, "HANDOFF_ORDER", f"Vision OCR ({vision.get('type')}): {extracted}", closed["confirm_bubbles"])
-                return {"decision": "HANDOFF_ORDER", "order": closed["order"], "bubbles": closed["confirm_bubbles"]}
+                log_grill(psid, conv.get("customer_name", "ลูกค้า"), trigger_type, "HANDOFF_ORDER", f"Vision OCR ({vision.get('type')}, silent handoff): {extracted}", [])
+                return {"decision": "HANDOFF_ORDER", "order": closed["order"], "bubbles": []}
 
             upsert_conversation({"psid": psid, "branch": branch, "status": "HANDOFF", "next_followup_at": None})
             await asyncio.to_thread(

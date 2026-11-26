@@ -1415,7 +1415,7 @@ def generate_3enter_reply(
                 vip_returning_rule,
                 "- กฎเหล็ก #1 ซอย 3 Enter สั้นสุดๆ แบบคนพิมพ์แชทไวๆ (ห้ามประโยคยาวเด็ดขาด!): แต่ละ Enter ยาวแค่ 4–8 คำ (ไม่เกิน 28–32 ตัวอักษร) ห้ามจบอ่อนๆ แบบ 'เดี๋ยวหนูเช็กให้ค่ะ' หรือ 'รอให้บริการเสมอค่ะ'",
                 "- กฎเหล็ก #2 ห้ามใช้ '?' ในภาษาไทย และห้ามใช้คำโป๊ะบอท (สะดวก/ทางร้าน/ลองสวม/สบายใจ/มีบริการ/เกรดพรีเมียม/ขอบพระคุณ/รอให้บริการ/เนื้อผ้ายีนส์ยืดนิ่มฟอกแล้ว)",
-                "- กฎเหล็ก #3 ยึดราคาจากแชทแอดมินก่อนเสมอ 100%: ถ้าแอดมินเคยพิมพ์ราคาไว้ในแชทแล้ว (เช่น 1,090 / 1,140 / 990) ให้ยึดราคานั้นเป๊ะ ห้ามกลับไปบอก 1,290 เด็ดขาด!",
+                "- กฎเหล็ก #3 ยึดราคาจากแชทแอดมินก่อนเสมอ 100%: ถ้าแอดมินเคยพิมพ์ราคาไว้ในแชทแล้ว (เช่น 1,090 / 1,140 / 990) ให้ยึดราคานั้นเป๊ะ ห้ามกลับไปบอก 1,290 เด็ดขาด! และ**ห้ามคิดเลขรวมยอดเงินโอน/สรุปยอดบิลเองเด็ดขาด** (เช่น สั่งหลายตัว/โปรไลฟ์/เสื้อ+กางเกง ห้ามพิมพ์ 'ยอดโอนรวม ... บาท' ถ้าแอดมินไม่ได้เป็นคนพิมพ์ยอดนั้นไว้! ให้บอกว่า 'รับทราบรายการค่ะ เดี๋ยวให้แอดมินสรุปยอดบิลให้เลยนะคะ')",
                 "- กฎเหล็ก #4 ตอบตามภาษาที่ลูกค้าพิมพ์ล่าสุด 100% (ไทย/อังกฤษ/พม่า/ลาว)",
                 "- กฎเหล็ก #5 ห้ามเดาไซส์ M ถ้ายังไม่รู้เอว, ห้ามเดารหัสสินค้า, ห้ามโกหกว่ามีของถ้าถามไซส์หมด, เอว >= 43 แจ้งตรงๆ ว่าใหญ่สุด 4XL (เอว 40-42), และ**ถ้าลูกค้าบอกว่าเคยใส่ไซส์ไหนของร้านแล้วคับ/หลวม (เช่น 'เคยสั่ง M คับ ต้อง L แล้วมั้ง') ให้ขยับแค่ +1 ไซส์ตามที่ลูกค้าเคยใส่จริง (เช่น M -> L) ห้ามกระโดดข้ามไซส์ไปแย้งลูกค้าตามตารางแข็งๆ เด็ดขาด!**",
                 "- กฎเหล็ก #6 ห้ามส่งพิกัดร้าน/โซน showcase/โปรลด 10-20% ซ้ำถ้าเคยส่งไปแล้วในแชทนี้! และถ้าลูกค้านัดวันเวลาแวะหน้าร้านแล้ว (เช่น 'วันเสาร์', 'บ่าย 3') ให้ตอบรับอบอุ่นสั้นๆ แค่ 1-2 บรรทัด ห้ามทวนพิกัดหรือถามซ้ำ!",
@@ -1559,7 +1559,21 @@ def generate_3enter_reply(
                     }.get(branch, ())
                     leaked_branch = any(ob in joined_b for ob in other_branches)
                     if bubbles and not leaked_branch and not (is_followup and _is_dup_bubble(bubbles[0], recent_sent)):
-                        return _enforce_1line_human_bubbles(bubbles, max_len=68, max_bubbles=4 if is_branch_4enter else 3)
+                        # Hard code guard: NEVER let AI invent/calculate an order total ("ยอดโอนรวม 3,400") unless human admin explicitly typed that exact number!
+                        admin_nums = set(
+                            re.sub(r",", "", n)
+                            for m in (messages or [])
+                            if m.get("sender_role") == "admin"
+                            for n in re.findall(r"\b\d{1,2},?\d{3}\b", m.get("text") or "")
+                        )
+                        safe_bubbles = []
+                        for b_line in bubbles:
+                            if re.search(r"(ยอดโอน|ยอดรวม|ยอดทั้งหมด|รวมทั้งหมด|รวมเป็น|ยอดชำระ)", b_line):
+                                quoted_nums = [re.sub(r",", "", n) for n in re.findall(r"\b\d{1,2},?\d{3}\b", b_line)]
+                                if quoted_nums and not all(qn in admin_nums for qn in quoted_nums):
+                                    b_line = "เดี๋ยวให้แอดมินสรุปยอดบิลที่ถูกต้องให้เลยนะคะ"
+                            safe_bubbles.append(b_line)
+                        return _enforce_1line_human_bubbles(safe_bubbles, max_len=68, max_bubbles=4 if is_branch_4enter else 3)
                 except Exception as inner_e:
                     err_s = str(inner_e)
                     LAST_LLM_STATUS.update({"model": cand_model, "ok": False, "error": err_s[:180], "at": time.strftime("%H:%M:%S")})
