@@ -1279,7 +1279,7 @@ def analyze_customer_image_with_gemini(image_url: str) -> Optional[Dict[str, Any
         from google.genai import types
 
         img_bytes = _req.get(image_url, timeout=15).content
-        client = genai.Client(api_key=api_key)
+        client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
         prompt = (
             "วิเคราะห์รูปภาพที่ลูกค้าส่งมาในแชทร้านยีนส์ ตอบเป็น JSON เท่านั้น: "
             '{"type": "SLIP" | "ADDRESS" | "PRODUCT" | "OTHER", '
@@ -1374,7 +1374,7 @@ def generate_3enter_reply(
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=api_key)
+            client = genai.Client(api_key=api_key, http_options={"api_version": "v1beta"})
 
             chat_lines = []
             for m in messages[-16:]:
@@ -1500,7 +1500,7 @@ def generate_3enter_reply(
             if time.time() < globals().get("_GEMINI_429_UNTIL", 0.0):
                 cand_models = []
             else:
-                cand_models = dict.fromkeys([model_name, "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest", "gemini-flash-lite-latest"])
+                cand_models = list(dict.fromkeys([model_name, "gemini-2.5-flash", "gemini-flash-latest"]))
             for cand_model in cand_models:
                 try:
                     gen_cfg = types.GenerateContentConfig(
@@ -1533,33 +1533,16 @@ def generate_3enter_reply(
                     }.get(branch, ())
                     leaked_branch = any(ob in joined_b for ob in other_branches)
                     if bubbles and not leaked_branch and not (is_followup and _is_dup_bubble(bubbles[0], recent_sent)):
-                        if not is_followup and messages and not _is_english_query(latest_cust_line):
-                            session_msgs = _recent_session_messages(messages, hours=18)
-                            has_prior = any(
-                                (m.get("sender_role") == "bot")
-                                or (
-                                    m.get("sender_role") == "admin"
-                                    and not is_auto_ad_greeting_text(
-                                        m.get("text") or "",
-                                        session_msgs[idx - 1].get("text") or "" if idx > 0 else "",
-                                    )
-                                )
-                                for idx, m in enumerate(session_msgs[:-1])
-                            )
-                            if has_prior:
-                                short_name = _clean_short_name(customer_name)
-                                call_name = f"พี่{short_name}" if short_name else "พี่"
-                                cust_text = " ".join((m.get("text") or "") for m in session_msgs if m.get("sender_role") == "customer").lower()
-                                facts = _extract_body_facts(cust_text, last_cust_only=last_c_raw, asked_waist=bool(already_covered.get("asked_size")))
-                                bubbles = _polish_human_flow(bubbles, call_name, branch, BRANCH_MAP.get(branch, BRANCH_MAP["ONLINE"]), already_covered, facts)
-                        return _enforce_1line_human_bubbles(bubbles)
+                        return _enforce_1line_human_bubbles(bubbles, max_len=68, max_bubbles=4 if is_branch_4enter else 3)
                 except Exception as inner_e:
                     err_s = str(inner_e)
                     LAST_LLM_STATUS.update({"model": cand_model, "ok": False, "error": err_s[:180], "at": time.strftime("%H:%M:%S")})
                     print(f"[Brain3Enter] {cand_model} error: {inner_e}")
                     if "429" in err_s or "RESOURCE_EXHAUSTED" in err_s:
-                        globals()["_GEMINI_429_UNTIL"] = time.time() + 900
-                        break
+                        # Short 20s cooldown (RPM resets quickly) instead of locking Gemini out for 15 minutes!
+                        globals()["_GEMINI_429_UNTIL"] = time.time() + 20
+                        time.sleep(2.0)
+                        continue
                     continue
         except Exception as e:
             LAST_LLM_STATUS.update({"model": "init", "ok": False, "error": str(e)[:180], "at": time.strftime("%H:%M:%S")})
