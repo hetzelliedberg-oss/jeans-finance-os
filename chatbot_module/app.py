@@ -199,19 +199,12 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
                 conv.get("ad_name") or "",
                 dry_run,
             )
-            confirm_bubbles = closed["confirm_bubbles"]
-            send_res = await meta_client.send_3enter_sequence(psid, confirm_bubbles, dry_run=dry_run)
-            now = utc_now_iso()
-            if not dry_run and send_res.get("ok"):
-                for idx, b_text in enumerate(confirm_bubbles):
-                    mid = (send_res.get("msg_ids") or [])[idx] if idx < len(send_res.get("msg_ids") or []) else f"bot_{psid}_{now}_{idx}"
-                    save_message(mid, psid, "bot", b_text, now)
+            # Customer already sent address/phone/transfer -> stop bot silently in THIS chat only & let human admin step in!
             upsert_conversation(
                 {
                     "psid": psid,
                     "branch": branch,
                     "status": "WON",
-                    "last_bot_msg_at": now if not dry_run else conv.get("last_bot_msg_at"),
                     "followup_stage": 0,
                     "next_followup_at": None,
                 }
@@ -221,10 +214,10 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
                 conv.get("customer_name", "ลูกค้า"),
                 trigger_type,
                 "HANDOFF_ORDER",
-                f"{grill['reason']} | Order #{closed['order']['id']} ({closed['order']['items']} {closed['order']['amount']}฿)",
-                confirm_bubbles,
+                f"{grill['reason']} (Silent handoff to human admin) | Order #{closed['order']['id']} ({closed['order']['items']} {closed['order']['amount']}฿)",
+                [],
             )
-            return {"decision": "HANDOFF_ORDER", "order": closed["order"], "bubbles": confirm_bubbles}
+            return {"decision": "HANDOFF_ORDER", "order": closed["order"], "bubbles": []}
 
         if decision == "HANDOFF_ESCALATE":
             last_cust_msg = next(

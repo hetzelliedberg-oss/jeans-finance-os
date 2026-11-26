@@ -469,7 +469,12 @@ def grill_conversation(
             unhandled_cust.append(txt)
     unhandled_cust.reverse()
     unhandled_joined = " ".join(unhandled_cust[-5:]) or last_cust_text
-    extra_exchange_pats = (r"ส่งกลับ", r"ส่งไปเปลี่ยน", r"ตัวที่ส่ง", r"ส่งคืน", r"เปลี่ยนไซส์")
+    extra_exchange_pats = (
+        r"ส่งกลับ", r"ส่งไปเปลี่ยน", r"ตัวที่ส่ง", r"ส่งคืน", r"เปลี่ยนไซส์",
+        r"ผิดไซส์", r"ผิดสี", r"ผิดรุ่น", r"ส่งผิด", r"ไม่ตรงปก", r"สีไม่เหมือน",
+        r"คับไป", r"หลวมไป", r"แน่นไป", r"แจ้งปัญหา", r"ฟีดแบค", r"ติชม",
+        r"เลขพัสดุ", r"ขอเลข", r"เช็คพัสดุ", r"เช็กพัสดุ", r"เลขแทรค", r"ส่งหรือยัง", r"ส่งของยัง", r"ถึงไหนแล้ว",
+    )
     for pat in tuple(COMPLAINT_PATTERNS) + extra_exchange_pats:
         if re.search(pat, last_cust_text, re.IGNORECASE) or re.search(pat, unhandled_joined, re.IGNORECASE):
             return {
