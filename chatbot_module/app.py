@@ -577,9 +577,8 @@ async def poller_loop() -> None:
                     ex_cust_dt = parse_iso_dt(existing.get("last_customer_msg_at"))
                     ex_bot_dt = parse_iso_dt(existing.get("last_bot_msg_at"))
                     ex_adm_dt = parse_iso_dt(existing.get("last_admin_msg_at"))
-                    # 1) Smart Human-Admin Grace (180s): if human admin just replied within 3m, DO NOT interrupt live human chat!
-                    # Otherwise if customer messaged in last 30m and neither admin nor bot replied after customer -> fall through so AI answers!
-                    ex_admin_active = bool(ex_adm_dt and (ex_now - ex_adm_dt).total_seconds() <= 180)
+                    # 1) Smart Human-Admin Grace (600s = 10m): if human admin replied within 10m, DO NOT interrupt live human chat!
+                    ex_admin_active = bool(ex_adm_dt and (ex_now - ex_adm_dt).total_seconds() <= 600)
                     if (
                         not ex_admin_active
                         and ex_st not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")
@@ -771,7 +770,7 @@ async def poller_loop() -> None:
                 is_after_boot = bool(cust_dt and (cust_dt >= (BOT_STARTED_AT - timedelta(seconds=120)) or cust_age_sec <= 14400))
                 admin_dt = parse_iso_dt(last_human_admin_at)
                 admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
-                admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 180)
+                admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 600)
                 # Smart AI: answer every unanswered customer message immediately when human admin is NOT actively chatting (3m grace)
                 bot_needs_reply = bool(
                     last_role == "customer"

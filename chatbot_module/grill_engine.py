@@ -474,6 +474,7 @@ def grill_conversation(
         r"ผิดไซส์", r"ผิดสี", r"ผิดรุ่น", r"ส่งผิด", r"ไม่ตรงปก", r"สีไม่เหมือน",
         r"คับไป", r"หลวมไป", r"แน่นไป", r"แจ้งปัญหา", r"ฟีดแบค", r"ติชม",
         r"เลขพัสดุ", r"ขอเลข", r"เช็คพัสดุ", r"เช็กพัสดุ", r"เลขแทรค", r"ส่งหรือยัง", r"ส่งของยัง", r"ถึงไหนแล้ว",
+        r"ต้นขา", r"รอบขา", r"หน้าผ้า", r"รอบแขน", r"อกกี่นิ้ว", r"ส่งต่างประเทศ", r"ต่างประเทศ",
     )
     for pat in tuple(COMPLAINT_PATTERNS) + extra_exchange_pats:
         if re.search(pat, last_cust_text, re.IGNORECASE) or re.search(pat, unhandled_joined, re.IGNORECASE):
@@ -485,7 +486,20 @@ def grill_conversation(
                 "already_covered": covered,
             }
 
-    # 2a-ter. Explicit customer defer/closing ("เดี๋ยวสิ้นเดือนทักไปสั่ง", "ไว้ก่อน", "สั่งออนไลน์แล้วรอรับของ") ->
+    # 2a-ter. Explicit customer defer/closing or bot-annoyance ("ข้อความอัตโนมัติ", "บอทหรอ", "ai หรอ", "เดี๋ยวสิ้นเดือนทักไปสั่ง") ->
+    bot_annoy_pats = (r"ข้อความอัตโนมัติ", r"ตอบอัตโนมัติ", r"บอทหรอ", r"บอทเหรอ", r"ai\s*หรอ", r"เอไอหรอ", r"น่ารำคาญ", r"รำคาญ")
+    if any(re.search(p, last_cust_text, re.IGNORECASE) for p in bot_annoy_pats):
+        return {
+            "decision": "BLOCK",
+            "blacklist": True,
+            "end_conversation": True,
+            "reason": "Customer noticed auto-bot or expressed annoyance -> Blacklist chat silently for human admin",
+            "branch": branch,
+            "intent": intent,
+            "already_covered": covered,
+        }
+
+    # Explicit customer defer/closing ("เดี๋ยวสิ้นเดือนทักไปสั่ง", "ไว้ก่อน", "สั่งออนไลน์แล้วรอรับของ") ->
     # STOP immediately & close gracefully (NEVER push sales or fire follow-ups!)
     defer_or_ordered_pats = (
         r"สิ้นเดือน", r"เงินเดือนออก", r"เดี๋ยวทักไปสั่ง", r"เดี๋ยวค่อยสั่ง", r"ค่อยสั่ง",
