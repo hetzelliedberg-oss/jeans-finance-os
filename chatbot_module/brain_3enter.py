@@ -1497,10 +1497,19 @@ def generate_3enter_reply(
 
 ตอบกลับเป็น JSON เท่านั้น: {json_fmt}"""
 
-            if time.time() < globals().get("_GEMINI_429_UNTIL", 0.0):
-                cand_models = []
-            else:
-                cand_models = list(dict.fromkeys([model_name, "gemini-2.5-flash", "gemini-flash-latest"]))
+            _m429 = globals().setdefault("_MODEL_429_UNTIL", {})
+            now_ts = time.time()
+            cand_models = [
+                m for m in dict.fromkeys([
+                    "gemini-3.5-flash-lite",
+                    "gemini-3.1-flash-lite",
+                    "gemini-3-flash-preview",
+                    "gemini-flash-latest",
+                    model_name,
+                    "gemini-2.5-flash",
+                ])
+                if m and now_ts >= _m429.get(m, 0.0)
+            ]
             for cand_model in cand_models:
                 try:
                     gen_cfg = types.GenerateContentConfig(
@@ -1539,9 +1548,8 @@ def generate_3enter_reply(
                     LAST_LLM_STATUS.update({"model": cand_model, "ok": False, "error": err_s[:180], "at": time.strftime("%H:%M:%S")})
                     print(f"[Brain3Enter] {cand_model} error: {inner_e}")
                     if "429" in err_s or "RESOURCE_EXHAUSTED" in err_s:
-                        # Short 20s cooldown (RPM resets quickly) instead of locking Gemini out for 15 minutes!
-                        globals()["_GEMINI_429_UNTIL"] = time.time() + 20
-                        time.sleep(2.0)
+                        # Per-model cooldown (5m) so other Gemini models keep working seamlessly!
+                        _m429[cand_model] = time.time() + 300
                         continue
                     continue
         except Exception as e:
