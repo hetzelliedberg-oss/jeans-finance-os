@@ -1473,7 +1473,7 @@ def generate_3enter_reply(
                 if is_branch_4enter
                 else "1-3 ข้อความสั้นๆ (Enter ละ 1 ประโยคสั้นๆ) **ตอบตามบริบทจริงล่าสุดของลูกค้าเป็นหลัก**: ถ้าลูกค้าเล่าว่าซื้อแล้ว/ชม/ขอบคุณ ให้ขอบคุณอย่างจริงใจและแนะนำถนอมผ้าสั้นๆ ห้ามขายซ้ำหรือส่งพิกัดซ้ำ; ถ้าลูกค้าถามเฉพาะจุดให้ตอบตรงประเด็นนั้นอย่างเป็นธรรมชาติเหมือนแอดมินคนจริงๆ"
             )
-            json_fmt = '{"enter1": "...", "enter2": "...", "enter3": "...", "enter4": "..."}' if is_branch_4enter else '{"enter1": "...", "enter2": "...", "enter3": "..."}'
+            json_fmt = '{"action": "SEND|SKIP_CLOSED|HANDOFF_ADMIN", "reason": "เหตุผลสั้นๆ", "enter1": "...", "enter2": "...", "enter3": "...", "enter4": "..."}' if is_branch_4enter else '{"action": "SEND|SKIP_CLOSED|HANDOFF_ADMIN", "reason": "เหตุผลสั้นๆ", "enter1": "...", "enter2": "...", "enter3": "..."}'
 
             fact_hints = []
             if facts_check.get("size_label"):
@@ -1514,6 +1514,11 @@ def generate_3enter_reply(
 
 >>> ข้อความล่าสุดที่ลูกค้าเพิ่งพิมพ์ (ต้องตอบให้ตรงบริบทข้อความนี้เป็นหลัก): "{latest_cust_line}"
 
+สำคัญมาก — กฎวิจารณญาณ (AI Self-Gatekeeper) ก่อนตอบทุกครั้งให้เลือก action:
+- เลือก "SKIP_CLOSED" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าจบบทสนทนาแล้ว / บอกจะโอนพรุ่งนี้-เดี๋ยวทักกลับ-ขอเดินช็อปปิ้งก่อน / นัดวันเวลาเรียบร้อยแล้ว / แอดมินตอบครบแล้ว / หรือถ้าส่งข้อความตอนนี้จะดูจี้ซ้ำน่ารำคาญ
+- เลือก "HANDOFF_ADMIN" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าถามสเปกวัดจริงเฉพาะรุ่นที่ไม่มีข้อมูลแน่นอน / เทียบหลายรุ่น / เคสละเอียดอ่อนที่แอดมินคนจริงควรตอบเอง (ห้ามเดามั่ว!)
+- เลือก "SEND" เฉพาะเมื่อมั่นใจ 100% ว่าตอบตรงบริบทจริง สั้นคมเหมือนคน และไม่ซ้ำซาก
+
 ตอบกลับเป็น JSON เท่านั้น: {json_fmt}"""
 
             _m429 = globals().setdefault("_MODEL_429_UNTIL", {})
@@ -1548,6 +1553,10 @@ def generate_3enter_reply(
                     )
                     LAST_LLM_STATUS.update({"model": cand_model, "ok": True, "error": "", "at": time.strftime("%H:%M:%S")})
                     data = json.loads(resp.text)
+                    ai_action = str(data.get("action") or "SEND").strip().upper()
+                    if ai_action in ("SKIP_CLOSED", "HANDOFF_ADMIN", "SKIP", "STOP"):
+                        print(f"[Brain3Enter] AI Self-Gatekeeper -> {ai_action}: {data.get('reason', '')}")
+                        return []
                     keys = ("enter1", "enter2", "enter3", "enter4") if is_branch_4enter else ("enter1", "enter2", "enter3")
                     bubbles = [(data.get(k) or "").replace("**", "").strip() for k in keys if (data.get(k) or "").strip()]
                     joined_b = " ".join(bubbles)
