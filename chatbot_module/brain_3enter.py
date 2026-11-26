@@ -1363,11 +1363,13 @@ def generate_3enter_reply(
             return []
 
     facts_check = _extract_body_facts(last_c_raw, last_cust_only=last_c_raw)
-    # Use Gemini for ALL real sales/question/follow-up turns so answers are flexible, context-aware & human-like;
-    # only skip LLM for fixed after-sales/tracking acks or when API key is missing.
+    # Smart Free-Tier Quota Optimizer:
+    # Reserve Gemini 3.1 Flash-Lite 100% for ALL live INSTANT_REPLY + hot early Follow-up stages (0..2);
+    # use crisp 3-Enter templates for late Follow-up stages (3..7) so 540 free req/day covers ~1,200+ turns/day at 0 THB!
     use_deterministic_only = (
         not api_key
         or intent in ("AFTER_SALES_THANKS", "SHIPPING_TRACKING")
+        or (is_followup and followup_stage >= 3)
     )
     if not use_deterministic_only:
         try:
@@ -1415,7 +1417,8 @@ def generate_3enter_reply(
                 "- กฎเหล็ก #2 ห้ามใช้ '?' ในภาษาไทย และห้ามใช้คำโป๊ะบอท (สะดวก/ทางร้าน/ลองสวม/สบายใจ/มีบริการ/เกรดพรีเมียม/ขอบพระคุณ/รอให้บริการ/เนื้อผ้ายีนส์ยืดนิ่มฟอกแล้ว)",
                 "- กฎเหล็ก #3 ยึดราคาจากแชทแอดมินก่อนเสมอ 100%: ถ้าแอดมินเคยพิมพ์ราคาไว้ในแชทแล้ว (เช่น 1,090 / 1,140 / 990) ให้ยึดราคานั้นเป๊ะ ห้ามกลับไปบอก 1,290 เด็ดขาด!",
                 "- กฎเหล็ก #4 ตอบตามภาษาที่ลูกค้าพิมพ์ล่าสุด 100% (ไทย/อังกฤษ/พม่า/ลาว)",
-                "- กฎเหล็ก #5 ห้ามเดาไซส์ M ถ้ายังไม่รู้เอว, ห้ามเดารหัสสินค้า, ห้ามโกหกว่ามีของถ้าถามไซส์หมด, เอว >= 43 แจ้งตรงๆ ว่าใหญ่สุด 4XL (เอว 40-42)",
+                "- กฎเหล็ก #5 ห้ามเดาไซส์ M ถ้ายังไม่รู้เอว, ห้ามเดารหัสสินค้า, ห้ามโกหกว่ามีของถ้าถามไซส์หมด, เอว >= 43 แจ้งตรงๆ ว่าใหญ่สุด 4XL (เอว 40-42), และ**ถ้าลูกค้าบอกว่าเคยใส่ไซส์ไหนของร้านแล้วคับ/หลวม (เช่น 'เคยสั่ง M คับ ต้อง L แล้วมั้ง') ให้ขยับแค่ +1 ไซส์ตามที่ลูกค้าเคยใส่จริง (เช่น M -> L) ห้ามกระโดดข้ามไซส์ไปแย้งลูกค้าตามตารางแข็งๆ เด็ดขาด!**",
+                "- กฎเหล็ก #6 ห้ามส่งพิกัดร้าน/โซน showcase/โปรลด 10-20% ซ้ำถ้าเคยส่งไปแล้วในแชทนี้! และถ้าลูกค้านัดวันเวลาแวะหน้าร้านแล้ว (เช่น 'วันเสาร์', 'บ่าย 3') ให้ตอบรับอบอุ่นสั้นๆ แค่ 1-2 บรรทัด ห้ามทวนพิกัดหรือถามซ้ำ!",
             ]
             if branch == "ONLINE" and intent != "ASK_BRANCH":
                 no_repeat_rules.append("- แชทนี้อยู่ช่องทาง ONLINE: ห้ามเอ่ยถึงหน้าร้านหรือสาขาโคราช/ขอนแก่น/อุดรเด็ดขาด")
@@ -1443,6 +1446,11 @@ def generate_3enter_reply(
                 already_covered.get("sent_branch_kkc")
                 or already_covered.get("sent_branch_korat")
                 or already_covered.get("sent_branch_udn")
+                or any(
+                    any(k in (m.get("text") or "").lower() for k in ("showcase", "พิกัดร้าน", "ติดบันไดเลื่อน", "ลด 10", "โซนโชว์เคส"))
+                    for m in (messages or [])[-12:]
+                    if m.get("sender_role") in ("bot", "admin")
+                )
             )
             skip_4enter = any(
                 k in last_c_raw
