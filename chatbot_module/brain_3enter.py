@@ -916,28 +916,13 @@ def _build_fallback_3enter(
         return [e1, e2, e3]
 
     if ask_size_chart:
-        e1 = (
-            f"{call_name}คะ ตารางไซส์รุ่นนี้ค่ะ (ผ้ายีนส์ยืดนิ่ม ยืดได้อีก 1–2 นิ้ว)\n"
-            f"M : เอว 26–28\" สะโพก 36–38\"\n"
-            f"L : เอว 28–30\" สะโพก 38–40\"\n"
-            f"XL : เอว 30–32\" สะโพก 40–42\"\n"
-            f"2XL : เอว 32–34\" สะโพก 42–44\"\n"
-            f"3XL : เอว 34–36\" สะโพก 44–46\"\n"
-            f"4XL : เอว 38–40\" สะโพก 48–50\""
-        )
+        e1 = "มีครบไซส์ M ถึง 4XL เอว 26–42 นิ้วเลยค่ะ"
         e2 = (
-            f"ของพร้อมส่งราคาตัวละ {price_label} "
-            + (
-                f"(โปรหน้าร้าน {branch_desc}: 1 ตัวลด 10%, 2 ตัวลด 20%)"
-                if branch != "ONLINE"
-                else (
-                    "ส่งฟรี EMS 1–2 วันถึง / เก็บปลายทางไม่บวกเพิ่ม สินค้าตรงปก แกะเช็คของหน้าบ้านก่อนจ่ายได้ ใส่ไม่พอดีเปลี่ยนไซส์ได้ค่ะ (โปรคู่ 2 ตัว 2,400 บาทค่ะ)"
-                    if allow_2400
-                    else "ส่งฟรี EMS 1–2 วันถึง / เก็บปลายทางไม่บวกเพิ่ม สินค้าตรงปก แกะเช็คของหน้าบ้านก่อนจ่ายได้ ใส่ไม่พอดีเปลี่ยนไซส์ได้ค่ะ"
-                )
-            )
+            "ผ้ายีนส์ยืดนิ่ม โปร 2 ตัว 2,400 ส่งฟรีค่ะ"
+            if (branch == "ONLINE" and allow_2400)
+            else "ผ้ายีนส์ยืดนิ่ม ยืดได้อีก 1–2 นิ้วใส่สบายค่ะ"
         )
-        e3 = _close_e3(f"{call_name}รับเป็นไซส์ไหนดีคะ หรือบอกเอว-สะโพกพร้อมชื่อ ที่อยู่ เบอร์โทร ให้แอดมินทำออเดอร์แพ็กส่งรอบวันนี้ได้เลยค่ะ?")
+        e3 = _close_e3("พี่เอวกับสะโพกเท่าไหร่คะ เดี๋ยวหนูเทียบไซส์เป๊ะๆ ให้")
         return [e1, e2, e3]
 
     if intent == "ASK_WAIST_RISE":
@@ -1564,6 +1549,24 @@ def generate_3enter_reply(
             LAST_LLM_STATUS.update({"model": "init", "ok": False, "error": str(e)[:180], "at": time.strftime("%H:%M:%S")})
             print(f"[Brain3Enter] Gemini fallback due to error: {e}")
 
+    # CRITICAL SAFETY GUARD: if Gemini failed (e.g. 429 quota exhausted), NEVER dump dumb fallback into
+    # active human-admin chats (<15m) or sensitive refund/tracking/order-confirm chats!
+    if not use_deterministic_only and messages:
+        from grill_engine import parse_iso_dt as _pdt_fb
+        from datetime import datetime as _dt_fb, timezone as _tz_fb
+        now_fb = _dt_fb.now(_tz_fb.utc)
+        last_adm_fb = next(
+            (_pdt_fb(m.get("created_at")) for m in reversed(messages) if m.get("sender_role") == "admin" and _pdt_fb(m.get("created_at"))),
+            None,
+        )
+        if last_adm_fb and (now_fb - last_adm_fb).total_seconds() <= 900:
+            print("[Brain3Enter] Gemini unavailable + human admin active (<15m) -> Stay silent instead of dumb fallback")
+            return []
+        recent_fb_txt = " ".join((m.get("text") or "") for m in messages[-8:])
+        if re.search(r"(เลขบัญชี|โอนคืน|คืนเงิน|WB\d+TH|เลขพัสดุ|ยังไม่ได้ส่ง|ยืนยันสินค้า|ขออภัย.*AI|AI แทรก)", recent_fb_txt, re.I):
+            print("[Brain3Enter] Gemini unavailable + sensitive refund/tracking/confirm chat -> Stay silent")
+            return []
+
     res = _build_fallback_3enter(
         customer_name=customer_name,
         branch=branch,
@@ -1574,6 +1577,15 @@ def generate_3enter_reply(
         followup_stage=followup_stage,
         messages=messages,
     )
+    # Hard single-line guard: NEVER send multi-line (\n) robotic walls of text! Split cleanly into <=3 short Enters.
+    if res:
+        flat_res = []
+        for b_item in res:
+            for part in str(b_item).splitlines():
+                p = part.strip()
+                if p:
+                    flat_res.append(p)
+        res = flat_res[:3]
     if not is_followup and intent not in ("AFTER_SALES_THANKS", "SHIPPING_TRACKING") and messages:
         last_c = next(((m.get("text") or "").lower() for m in reversed(messages) if m.get("sender_role") == "customer"), "")
         session_msgs = _recent_session_messages(messages, hours=18)
