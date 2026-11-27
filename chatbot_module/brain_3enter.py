@@ -1468,7 +1468,7 @@ def generate_3enter_reply(
 
 สำคัญมาก — กฎวิจารณญาณ (AI Self-Gatekeeper) ก่อนตอบทุกครั้งให้เลือก action:
 - เลือก "SKIP_CLOSED" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าจบบทสนทนาแล้ว / บอกจะโอนพรุ่งนี้-เดี๋ยวทักกลับ-ขอเดินช็อปปิ้งก่อน / นัดวันเวลาเรียบร้อยแล้ว / แอดมินตอบครบแล้ว / หรือถ้าส่งข้อความตอนนี้จะดูจี้ซ้ำน่ารำคาญ
-- เลือก "HANDOFF_ADMIN" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าถามสเปกวัดจริงเฉพาะรุ่นที่ไม่มีข้อมูลแน่นอน / เทียบหลายรุ่น / เคสละเอียดอ่อนที่แอดมินคนจริงควรตอบเอง (ห้ามเดามั่ว!)
+- เลือก "HANDOFF_ADMIN" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าถามสเปกวัดจริงเฉพาะรุ่นที่ไม่มีข้อมูลแน่นอน / ถามว่า "มีกี่แบบ / มีแบบไหนบ้าง / ขอดูแบบ / ขอดูลาย" ที่ต้องให้แอดมินส่งรูปรุ่นจริงในสต็อก / เทียบหลายรุ่น / เคสละเอียดอ่อนที่แอดมินคนจริงควรตอบเอง (ห้ามเดามั่ว!)
 - เลือก "SEND" เฉพาะเมื่อมั่นใจ 100% ว่าตอบตรงบริบทจริง สั้นคมเหมือนคน และไม่ซ้ำซาก
 
 ตอบกลับเป็น JSON เท่านั้น: {json_fmt}"""
@@ -1478,25 +1478,37 @@ def generate_3enter_reply(
             cand_models = [
                 m for m in dict.fromkeys([
                     "gemini-3.1-flash-lite",
+                    "gemini-flash-lite-latest",
+                    "gemini-3.6-flash",
+                    "gemini-3.5-flash",
                     "gemini-3-flash-preview",
                     "gemini-flash-latest",
                     model_name,
                     "gemini-2.5-flash",
+                    "gemma-4-26b-a4b-it",
+                    "gemma-4-31b-it",
                 ])
                 if m and now_ts >= _m429.get(m, 0.0)
             ]
             for cand_model in cand_models:
+                is_gemma = cand_model.startswith("gemma")
+                use_thinking_zero = cand_model in ("gemini-2.5-flash", "gemini-3.1-flash-lite")
                 try:
-                    gen_cfg = types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.65,
-                        thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    )
+                    if is_gemma:
+                        gen_cfg = types.GenerateContentConfig(temperature=0.55)
+                    elif use_thinking_zero:
+                        gen_cfg = types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.65,
+                            thinking_config=types.ThinkingConfig(thinking_budget=0),
+                        )
+                    else:
+                        gen_cfg = types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            temperature=0.65,
+                        )
                 except Exception:
-                    gen_cfg = types.GenerateContentConfig(
-                        response_mime_type="application/json",
-                        temperature=0.65,
-                    )
+                    gen_cfg = types.GenerateContentConfig(temperature=0.65)
                 try:
                     resp = client.models.generate_content(
                         model=cand_model,
@@ -1504,7 +1516,12 @@ def generate_3enter_reply(
                         config=gen_cfg,
                     )
                     LAST_LLM_STATUS.update({"model": cand_model, "ok": True, "error": "", "at": time.strftime("%H:%M:%S")})
-                    data = json.loads(resp.text)
+                    raw_out = (resp.text or "").strip()
+                    if is_gemma and not raw_out.startswith("{"):
+                        m_js = re.search(r"\{.*\}", raw_out, re.S)
+                        if m_js:
+                            raw_out = m_js.group(0)
+                    data = json.loads(raw_out)
                     ai_action = str(data.get("action") or "SEND").strip().upper()
                     if ai_action in ("SKIP_CLOSED", "HANDOFF_ADMIN", "SKIP", "STOP"):
                         print(f"[Brain3Enter] AI Self-Gatekeeper -> {ai_action}: {data.get('reason', '')}")
