@@ -444,6 +444,21 @@ def grill_conversation(
     intent = detect_intent(last_cust_text, is_followup=is_followup)
     covered = analyze_already_covered(active_msgs)
 
+    # 0. Hard Anti-Spam Cooldown for FOLLOWUP: NEVER double/triple-text if Page ALREADY sent a message within 2 hours!
+    if is_followup and messages:
+        last_page_dt_fup = next(
+            (parse_iso_dt(m.get("created_at")) for m in reversed(messages) if m.get("sender_role") in ("bot", "admin") and parse_iso_dt(m.get("created_at"))),
+            None,
+        )
+        if last_page_dt_fup and (datetime.now(timezone.utc) - last_page_dt_fup).total_seconds() < 7200:
+            return {
+                "decision": "BLOCK",
+                "reason": "Anti-spam cooldown: Page already sent a message within 2h -> never double/triple text",
+                "branch": branch,
+                "intent": intent,
+                "already_covered": covered,
+            }
+
     # 1. Check 24-hour Meta messaging window
     if last_cust_dt:
         hours_since = (datetime.now(timezone.utc) - last_cust_dt).total_seconds() / 3600.0
@@ -546,12 +561,10 @@ def grill_conversation(
     has_negative_stop = bool(re.search(r"ไม่เอา|ไม่รับ|อย่าทัก|ไม่ต้องทัก|รำคาญ|ยกเลิก|คืนเงิน", last_cust_text))
     has_new_product_q = any(
         q in last_cust_text
-        for q in ["ราคา", "เท่าไหร่", "เท่าไร", "กี่บาท", "กระโปรง", "ขาสั้น", "รุ่นอื่น", "สั่งเพิ่ม", "ตัวใหม่", "อีกตัว", "มีสี", "ขอดู"]
+        for q in ["ราคา", "เท่าไหร่", "เท่าไร", "กี่บาท", "กระโปรง", "ขาสั้น", "ขาม้า", "ทรง", "แบบอื่น", "สูง", "โปร", "2 ตัว", "รุ่นอื่น", "สั่งเพิ่ม", "ตัวใหม่", "อีกตัว", "มีสี", "ขอดู"]
     )
     if not has_negative_stop and not has_new_product_q:
-        if any(re.search(pat, last_cust_text, re.IGNORECASE) for pat in DELIVERY_THANKS_PATTERNS) or any(
-            re.search(pat, recent_cust_pair, re.IGNORECASE) for pat in DELIVERY_THANKS_PATTERNS
-        ):
+        if any(re.search(pat, last_cust_text, re.IGNORECASE) for pat in DELIVERY_THANKS_PATTERNS):
             if is_followup:
                 return {
                     "decision": "BLOCK",
