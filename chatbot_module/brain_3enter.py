@@ -1309,15 +1309,20 @@ def generate_3enter_reply(
                 return ["ได้เลยค่ะพี่ ไม่เป็นไรนะคะ 🙏 ถ้าสนใจรุ่นไหนหรืออยากเช็กไซส์ ทักหนูได้ตลอดเลยค่ะ"]
             if any(k in last_c_raw for k in ("ขอบคุณ", "ขอบพระคุณ", "รับทราบ", "โอเค", "เรียบร้อยแล้ว")):
                 return []
-    # Post-order guard: never interrupt a just-closed order from human admin (e.g. "สรุปออเดอร์การสั่งซื้อ", "คุณร้องขอไป ฿")
+    # Post-order guard: never interrupt a JUST-closed order from human admin (within last 12h ONLY — never block returning VIPs from days/weeks ago!)
     if not is_followup and messages:
+        from grill_engine import parse_iso_dt as _pdt
+        last_c_dt_guard = next((_pdt(m.get("created_at")) for m in reversed(messages) if m.get("sender_role") == "customer" and _pdt(m.get("created_at"))), None)
         recent_tail = messages[-6:]
-        has_recent_order_close = any(
-            any(k in (m.get("text") or "") for k in ("สรุปออเดอร์การสั่งซื้อ", "รับออเดอร์ค่ะ", "คุณร้องขอไป ฿", "ทำเครื่องหมายคำสั่งซื้อว่า"))
-            for m in recent_tail
-        )
+        has_recent_order_close = False
+        for m in recent_tail:
+            if any(k in (m.get("text") or "") for k in ("สรุปออเดอร์การสั่งซื้อ", "รับออเดอร์ค่ะ", "คุณร้องขอไป ฿", "ทำเครื่องหมายคำสั่งซื้อว่า")):
+                m_dt_guard = _pdt(m.get("created_at"))
+                if not last_c_dt_guard or not m_dt_guard or (last_c_dt_guard - m_dt_guard).total_seconds() <= 12 * 3600:
+                    has_recent_order_close = True
+                    break
         has_new_followup_question = any(
-            k in last_c_raw for k in ("อีก", "เพิ่ม", "เสื้อ", "กระโปรง", "รุ่นนี้", "รุ่นอื่น", "ราคา", "กี่บาท", "ไซส์", "เอว", "หนาไหม")
+            k in last_c_raw for k in ("อีก", "เพิ่ม", "เสื้อ", "กระโปรง", "รุ่นนี้", "รุ่นอื่น", "ตัวนี้", "สนใจ", "ราคา", "กี่บาท", "ไซส์", "เอว", "หนาไหม")
         )
         if has_recent_order_close and not has_new_followup_question:
             return []
@@ -1359,15 +1364,19 @@ def generate_3enter_reply(
 
             # Auto-detect VIP Returning Customer from chat history (prior order/address + prior size)
             all_hist_txt = " ".join((m.get("text") or "") for m in (messages or []))
+            saved_addr_raw = _extract_saved_address_from_history(messages or [])
+            saved_addr_short = re.sub(r"\s+", " ", saved_addr_raw).strip()[:95] if saved_addr_raw else ""
             has_past_purchase = bool(
-                re.search(r"(สรุปออเดอร์|รับออเดอร์|จัดส่งให้|ที่อยู่\s*:|เบอร์\s*:|0[689]\d[\-\s]?\d{3}[\-\s]?\d{4}|รหัส\s*:|ตำบล|อำเภอ|แขวง|เขต)", all_hist_txt)
+                saved_addr_short
+                or re.search(r"(สรุปออเดอร์|รับออเดอร์|จัดส่งให้|ที่อยู่\s*:|เบอร์\s*:|0[689]\d[\-\s]?\d{3}[\-\s]?\d{4}|รหัส\s*:|ตำบล|อำเภอ|แขวง|เขต)", all_hist_txt)
             )
             past_size_matches = re.findall(r"\b(4XL|3XL|2XL|XL|L|M)\b", all_hist_txt.upper())
             past_size_hint = past_size_matches[-1] if past_size_matches else ""
+            addr_clause = f" | ที่อยู่เดิมที่ดึงได้จากแชท: \"{saved_addr_short}\"" if saved_addr_short else ""
             vip_returning_rule = (
-                f"- กฎ VIP ลูกค้าเก่าเคยซื้อแล้ว (พบประวัติสั่งซื้อ/ที่อยู่เดิมในแชทนี้! ไซส์เดิม={past_size_hint or 'เช็กจากแชทข้างบน'}): ถ้าลูกค้าทักมาสนใจซื้อเพิ่ม (ไม่ได้มาตามของ/เปลี่ยนของ/เคลม) **ห้ามพูดว่า 'รับเพิ่มอีกตัว' หรือ 'รับ 1 ตัว' เด็ดขาด!** (มันปิดกั้นยอดขาย!) ต้องเปิดทาง Upsell 2-3 ตัวทันที 3 Enter: enter1='ไซส์เดิม {past_size_hint or '...'} ที่อยู่เดิมเลยใช่ไหมคะพี่' | enter2='รับคู่ 2 ตัว 2,400 หรือ 3 ตัวคุ้มๆ ดีคะ' | enter3='เอาโอนหรือปลายทางดีคะพี่'"
+                f"- กฎ VIP ลูกค้าเก่าเคยซื้อแล้ว (พบประวัติสั่งซื้อเดิม! ไซส์เดิม={past_size_hint or 'เช็กจากแชทข้างบน'}{addr_clause}): ถ้าลูกค้าทักมาสนใจซื้อเพิ่ม (ไม่ได้มาตามของ/เปลี่ยนของ/ได้รับของแล้ว/เคลม) **ต้องโชว์ไหวพริบดึงไซส์เดิม + ที่อยู่เดิมมาทวนทันทีแบบแอดมินเซียน! ห้ามถามเอวหรือขอที่อยู่ใหม่ซ้ำ และห้ามพูดว่า 'รับเพิ่มอีกตัว' หรือ 'รับ 1 ตัว' เด็ดขาด!** เปิดทาง Upsell 2-3 ตัวทันที 3 Enter สั้นๆ: enter1='รับไซส์เดิม {past_size_hint or '...'} ส่งที่อยู่เดิมเลยใช่ไหมคะพี่' (ถ้ามีที่อยู่เดิมให้เอ่ยชื่อ/อำเภอ/เบอร์เดิมสั้นๆ ยืนยันให้ลูกค้าว้าว!) | enter2='รับคู่ 2 ตัว 2,400 หรือ 3 ตัวคุ้มๆ ดีคะ' | enter3='เอาโอนหรือปลายทางดีคะพี่'"
                 if has_past_purchase
-                else "- กฎ Upsell ลูกค้าใหม่ (ห้ามพูดว่า 'รับ 1 ตัว' ปิดกั้นยอดขาย!): ถ้ารู้ไซส์แล้วให้เปิดทาง 2-3 ตัว เช่น 'โปร 2 ตัว 2,400 คุ้มกว่าน้า รับกี่ตัวดีคะ' + 'เอาโอนหรือปลายทางดีคะพี่' / ถ้ายังไม่รู้เอวให้ถามควบ 'พี่เอวเท่าไหร่คะ เอาโอนหรือปลายทางดีคะ'"
+                else "- กฎ Upsell ลูกค้าใหม่ (ห้ามพูดว่า 'รับ 1 ตัว' ปิดกั้นยอดขาย!): ถ้ารู้ไซส์แล้วให้เปิดทาง 2-3 ตัว เช่น 'โปร 2 ตัว 2,400 คุ้มกว่าน้า รับกี่ตัวดีคะ' + 'เอาโอนหรือปลายทางดีคะพี่' / ถ้ายังไม่รู้เอวให้ถามควบสั้นๆ 'พี่เอวเท่าไหร่คะ เอาโอนหรือปลายทางดีคะ'"
             )
 
             no_repeat_rules = [
@@ -1522,10 +1531,10 @@ def generate_3enter_reply(
                     joined_b = " ".join(bubbles)
                     asking_store = intent == "ASK_BRANCH" or any(k in latest_cust_line for k in ("หน้าร้าน", "สาขา", "อยู่ไหน", "จังหวัด", "where", "shop", "store", "branch", "location", "address", "mall"))
                     other_branches = () if (asking_store or _is_english_query(latest_cust_line)) else {
-                        "KORAT": ("ขอนแก่น", "อุดร"),
-                        "KKC": ("โคราช", "อุดร"),
-                        "UDN": ("โคราช", "ขอนแก่น"),
-                        "ONLINE": ("โคราช", "ขอนแก่น", "อุดร"),
+                        "KORAT": ("เซ็นทรัลขอนแก่น", "สาขาขอนแก่น", "เซ็นทรัลอุดร", "สาขาอุดร"),
+                        "KKC": ("เซ็นทรัลโคราช", "สาขาโคราช", "เซ็นทรัลอุดร", "สาขาอุดร"),
+                        "UDN": ("เซ็นทรัลโคราช", "สาขาโคราช", "เซ็นทรัลขอนแก่น", "สาขาขอนแก่น"),
+                        "ONLINE": ("เซ็นทรัลโคราช", "สาขาโคราช", "เซ็นทรัลขอนแก่น", "สาขาขอนแก่น", "เซ็นทรัลอุดร", "สาขาอุดร"),
                     }.get(branch, ())
                     leaked_branch = any(ob in joined_b for ob in other_branches)
                     if bubbles and not leaked_branch and not (is_followup and _is_dup_bubble(bubbles[0], recent_sent)):

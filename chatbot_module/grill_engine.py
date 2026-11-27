@@ -548,10 +548,19 @@ def grill_conversation(
         q in last_cust_text
         for q in ["ราคา", "เท่าไหร่", "เท่าไร", "กี่บาท", "กระโปรง", "ขาสั้น", "รุ่นอื่น", "สั่งเพิ่ม", "ตัวใหม่", "อีกตัว", "มีสี", "ขอดู"]
     )
-    if not is_followup and not has_negative_stop and not has_new_product_q:
+    if not has_negative_stop and not has_new_product_q:
         if any(re.search(pat, last_cust_text, re.IGNORECASE) for pat in DELIVERY_THANKS_PATTERNS) or any(
             re.search(pat, recent_cust_pair, re.IGNORECASE) for pat in DELIVERY_THANKS_PATTERNS
         ):
+            if is_followup:
+                return {
+                    "decision": "BLOCK",
+                    "end_conversation": True,
+                    "reason": "Customer already received delivery -> NEVER send sales follow-up",
+                    "branch": branch,
+                    "intent": "AFTER_SALES_THANKS",
+                    "already_covered": covered,
+                }
             already_thanked = conv_meta.get("status") == "CLOSED_GRACEFULLY" or any(
                 any(k in (m.get("text") or "") for k in ("ดีใจมากเลยค่ะที่ได้รับ", "ใส่พอดีถูกใจ", "ดูแลซักถนอม", "ใส่ถุงถนอมผ้า"))
                 for m in active_msgs
