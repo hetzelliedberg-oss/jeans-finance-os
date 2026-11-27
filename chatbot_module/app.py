@@ -117,7 +117,11 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
                         "next_followup_at": None,
                     }
                 )
-            elif "already from admin" in (grill.get("reason") or "").lower() or "already replied" in (grill.get("reason") or "").lower():
+            elif (
+                "already from admin" in (grill.get("reason") or "").lower()
+                or "already replied" in (grill.get("reason") or "").lower()
+                or "no customer messages" in (grill.get("reason") or "").lower()
+            ):
                 upsert_conversation(
                     {
                         "psid": psid,
@@ -282,15 +286,8 @@ async def process_customer_turn(psid: str, trigger_type: str = "INSTANT_REPLY") 
             log_grill(psid, conv.get("customer_name", "ลูกค้า"), trigger_type, "BLOCK", "All follow-up stages exhausted/deduplicated", [])
             return {"decision": "BLOCK", "reason": "Follow-up deduplicated / exhausted"}
 
-        image_urls = await asyncio.to_thread(
-            pick_images_for_reply,
-            messages,
-            intent,
-            branch,
-            conv.get("ad_name") or "",
-            is_followup,
-            stage,
-        )
+        # STRICT ZERO-WRONG-PHOTO POLICY: never auto-send unverified product/branch photos
+        image_urls: List[str] = []
         dry_run = get_bool_setting("dry_run_mode", True)
         send_res = await meta_client.send_3enter_sequence(psid, bubbles, dry_run=dry_run, image_urls=image_urls)
 
@@ -521,7 +518,7 @@ def _check_fraud_and_deletions(psid: str, cust_name: str, branch: str, raw_msgs:
             continue
         if any(mk in txt for mk in SYSTEM_ORDER_MARKERS) or any(mk in txt for mk in ADMIN_BILL_MARKERS):
             continue
-        if any(st in txt for st in ("📍", "เซนทรัล", "เซ็นทรัล", "พิกัดหน้าร้าน", "จัดส่งไปที่", "ผู้รับ:", "ที่อยู่:", "ที่อยู่ :", "0932135716", "082-927-1808", "0829271808", "098-110-8961", "0981108961")):
+        if any(st in txt for st in ("📍", "เซนทรัล", "เซ็นทรัล", "พิกัดหน้าร้าน", "จัดส่งไปที่", "ผู้รับ:", "ที่อยู่:", "ที่อยู่ :", "0932135716", "082-927-1808", "0829271808", "083-078-9329", "0830789329", "098-110-8961", "0981108961")):
             continue
         digits_list = re.findall(r"\b\d[\d\-]{8,14}\d\b", txt)
         clean_nums = [re.sub(r"\D", "", d) for d in digits_list if 10 <= len(re.sub(r"\D", "", d)) <= 13]
@@ -577,18 +574,16 @@ async def poller_loop() -> None:
                     ex_cust_dt = parse_iso_dt(existing.get("last_customer_msg_at"))
                     ex_bot_dt = parse_iso_dt(existing.get("last_bot_msg_at"))
                     ex_adm_dt = parse_iso_dt(existing.get("last_admin_msg_at"))
-                    # 1) Smart Human-Admin Grace (600s = 10m): if human admin replied within 10m, DO NOT interrupt live human chat!
-                    ex_admin_active = bool(ex_adm_dt and (ex_now - ex_adm_dt).total_seconds() <= 600)
+                    # 1) INSTANT REPLY (0s delay — faster than human admin!): whenever customer is the latest speaker, let AI + Self-Gatekeeper reply immediately!
                     if (
-                        not ex_admin_active
-                        and ex_st not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")
+                        ex_st not in ("WON", "BLACKLISTED", "CLOSED_GRACEFULLY", "HANDOFF", "HANDOFF_ALERTED", "HANDOFF_CRITICAL")
                         and ex_cust_dt
                         and (not ex_bot_dt or ex_cust_dt > ex_bot_dt)
                         and (not ex_adm_dt or ex_cust_dt > ex_adm_dt)
                         and (ex_now - ex_cust_dt).total_seconds() <= 1800
                     ):
                         pass
-                    # 2) If admin replied > 10m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
+                    # 2) If admin was last speaker > 10m ago and customer is silent inside 23h window -> arm 8-Step Follow-up!
                     elif ex_st == "ADMIN_REPLIED" and ex_adm_dt and ex_cust_dt and (ex_now - ex_adm_dt).total_seconds() > 600 and (ex_now - ex_cust_dt).total_seconds() <= 82800:
                         upsert_conversation({
                             "psid": psid,
@@ -771,10 +766,9 @@ async def poller_loop() -> None:
                 admin_dt = parse_iso_dt(last_human_admin_at)
                 admin_within_23h = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 82800)
                 admin_active_recent = bool(admin_dt and (now_utc - admin_dt).total_seconds() <= 600)
-                # Smart AI: answer every unanswered customer message immediately when human admin is NOT actively chatting (3m grace)
+                # INSTANT REPLY (0s delay — faster than human admin!): answer EVERY new customer message immediately via AI + Self-Gatekeeper!
                 bot_needs_reply = bool(
                     last_role == "customer"
-                    and not admin_active_recent
                     and cust_dt
                     and (not last_bot_dt or cust_dt > last_bot_dt)
                     and (new_customer_msg or cust_age_sec <= 1800)
@@ -795,9 +789,6 @@ async def poller_loop() -> None:
                 elif last_role == "customer" and (new_customer_msg or recover_unanswered) and (not existing or existing.get("status") != "BLACKLISTED"):
                     if admin_billed_active:
                         upsert_data["status"] = "WON"
-                        upsert_data["next_followup_at"] = None
-                    elif admin_active_recent:
-                        upsert_data["status"] = "ADMIN_REPLIED"
                         upsert_data["next_followup_at"] = None
                     else:
                         upsert_data["status"] = "OPEN" if (is_recent_msg and is_after_boot) else "SYNCED_OLD"

@@ -31,13 +31,13 @@ BRAND_KNOWLEDGE = """
   • รายละเอียดเพิ่มเติมจากลูกค้าจริง: ไม่มีซับในแต่ด้านในเก็บเรียบร้อยผ้านุ่มไม่คัน | ไม่ใช่เอวยางยืดสม็อกแต่เป็นผ้ายีนส์ยืดทั้งตัว | เป้าสูง ~13 นิ้ว ปลายขาหน้าผ้ากว้าง ~10–14 นิ้ว (รอบขา 20–28 นิ้ว) | ปกติเย็บมาจากโรงงาน หากให้จ้างช่างนอกเย็บปลายขาเพิ่มคิดค่าบริการ 50 บาท
 - หน้าร้าน 3 สาขาเท่านั้น (เปิดทุกวัน 10:30-21:00 โปรหน้าร้าน: ซื้อ 1 ตัวลด 10%, 2 ตัวลด 20%, ครบ 3,000 แถมเสื้อ 1 ตัว — จังหวัดอื่นเช่น กทม./อุบลฯ ยังไม่มีหน้าร้าน แต่สั่งออนไลน์ส่ง EMS 1-2 วันถึงได้):
   • ขอนแก่น (KKC): เซ็นทรัลขอนแก่น ชั้น G ตรงข้ามแว่นท็อปเจริญ (โทร 082-927-1808)
-  • โคราช (KORAT): เซ็นทรัลโคราช ชั้น 1 โซน showcase ติดบันไดเลื่อน ตรงข้ามร้านยืดเปล่า (โทร 098-110-8961)
+  • โคราช (KORAT): เซ็นทรัลโคราช ชั้น 1 โซน showcase ติดบันไดเลื่อน ตรงข้ามร้านยืดเปล่า (โทร 083-078-9329)
   • อุดรธานี (UDN): เซ็นทรัลอุดรธานี ชั้น 3 ตรงข้ามร้าน moshi moshi (โทร 093-213-5716)
 """.strip()
 
 BRANCH_MAP = {
     "KKC": "เซ็นทรัลขอนแก่น ชั้น G (ตรงข้ามแว่นท็อปเจริญ โทร 082-927-1808)",
-    "KORAT": "เซ็นทรัลโคราช ชั้น 1 โซน showcase (ติดบันไดเลื่อน ตรงข้ามร้านยืดเปล่า โทร 098-110-8961)",
+    "KORAT": "เซ็นทรัลโคราช ชั้น 1 โซน showcase (ติดบันไดเลื่อน ตรงข้ามร้านยืดเปล่า โทร 083-078-9329)",
     "UDN": "เซ็นทรัลอุดรธานี ชั้น 3 (ตรงข้ามร้าน moshi moshi โทร 093-213-5716)",
     "ONLINE": "ออนไลน์ (ส่งฟรี EMS 1-2 วันถึง / เก็บปลายทาง COD ไม่บวกเพิ่ม)",
 }
@@ -258,7 +258,7 @@ def _extract_saved_address_from_history(messages: List[Dict[str, Any]]) -> str:
     """Scan full conversation history (newest first) to extract a returning customer's real shipping address + phone."""
     if not messages:
         return ""
-    shop_exclude = re.compile(r"(093-?213-?5716|082-?927-?1808|098-?110-?8961|752-?0-?60883-?2|กรุงไทย|สุพัตรา|เซ็นทรัล|หน้าร้าน|โปรหน้าร้าน|ลด 10%|ลด 20%)")
+    shop_exclude = re.compile(r"(093-?213-?5716|082-?927-?1808|083-?078-?9329|098-?110-?8961|752-?0-?60883-?2|กรุงไทย|สุพัตรา|เซ็นทรัล|หน้าร้าน|โปรหน้าร้าน|ลด 10%|ลด 20%)")
     phone_re = re.compile(r"(?:\+66|0)[689]\d[\s-]?\d{3}[\s-]?\d{4}")
     addr_kw = re.compile(r"(หมู่|ม\.|ต\.|ตำบล|อ\.|อำเภอ|จ\.|จังหวัด|ซอย|ซ\.|ถ\.|ถนน|แขวง|เขต|บ้านเลขที่|รหัสไปรษณีย์|\b[1-9]\d{4}\b)")
     for m in reversed(messages):
@@ -1206,47 +1206,7 @@ def pick_images_for_reply(
     is_followup: bool = False,
     followup_stage: int = 0,
 ) -> List[str]:
-    """Select verified Meta attachment_ids (2 storefront photos for branches, alternating context-matched photo on follow-ups)."""
-    if intent in ("AFTER_SALES_THANKS", "SHIPPING_TRACKING"):
-        return []
-    if is_followup and (followup_stage % 2 == 1 or followup_stage >= 7):
-        return []
-    msgs = messages or []
-    last_cust = next(((m.get("text") or "").lower() for m in reversed(msgs) if m.get("sender_role") == "customer"), "")
-    ask_size_chart_img = (not is_followup) and _is_size_chart_request(last_cust)
-
-    def _is_page_img(m: Dict[str, Any]) -> bool:
-        if m.get("sender_role") not in ("bot", "admin"):
-            return False
-        t = m.get("text") or ""
-        return "[BOT_SENT_IMAGE]" in t or "[ADMIN_SENT_IMAGE]" in t or "[IMAGE" in t
-
-    # Never resend images if page/bot/admin already sent an image in recent messages
-    if any(_is_page_img(m) for m in msgs[-6:]):
-        return []
-
-    facts_img = _extract_body_facts(last_cust, last_cust_only=last_cust)
-    if facts_img.get("waist_too_big") or facts_img.get("waist_too_small"):
-        return []
-
-    # STRICT ZERO-WRONG-PHOTO POLICY:
-    # 1. Size chart (ONLY when customer explicitly asks for size chart / available sizes)
-    if ask_size_chart_img:
-        return [f"attachment_id:{CURATED_ATTACHMENTS['SIZE_CHART']}"]
-
-    # 2. Branch storefront photos: send AT MOST ONCE per 48h session; NEVER repeat on follow-ups if any image was already sent
-    recent_48h_imgs = sum(1 for m in _recent_session_messages(msgs, hours=48) if _is_page_img(m))
-    any_recent_20_imgs = any(_is_page_img(m) for m in msgs[-20:])
-    explicit_branch_ask = any(k in last_cust for k in ["หน้าร้าน", "ที่ไหน", "พิกัด", "สาขา", "ชั้น", "เซ็นทรัล", "ขอนแก่น", "อุดร", "โคราช"])
-    if branch in BRANCH_IMAGES and explicit_branch_ask:
-        if is_followup:
-            if any_recent_20_imgs or recent_48h_imgs > 0:
-                return []
-            return list(BRANCH_IMAGES[branch])
-        if not any(_is_page_img(m) for m in msgs[-6:]):
-            return list(BRANCH_IMAGES[branch])
-
-    # Never guess product/skirt/flare/SKU photos (each ad/model differs; admin sends exact model photos via Telegram alert)
+    """STRICT ZERO-WRONG-PHOTO POLICY: never auto-send unverified product or branch photos."""
     return []
 
 
@@ -1411,9 +1371,9 @@ def generate_3enter_reply(
             )
 
             no_repeat_rules = [
-                "- กฎเหล็ก #0 ประเมินสถานการณ์ก่อนตอบทุกครั้ง: (A) ลูกค้าสนใจซื้อ/ถามสินค้า -> ซอย 3 Enter สั้นคม + เร่งปิดการขายด้วยคำถามให้เลือก 'เอาโอนหรือปลายทางดีคะพี่' เสมอ! | (B) ลูกค้าเก่าเคยซื้อแล้วทักซื้อเพิ่ม -> ใช้กฎ VIP ทวนไซส์เดิม+ที่อยู่เดิม+โอนหรือปลายทาง | (C) ฟีดแบค/ตำหนิ/แจ้งปัญหา/ตามของ/เปลี่ยนไซส์ -> ห้ามขายของซ้ำเด็ดขาด! ตอบรับดูแลสั้นๆ แล้วส่งต่อแอดมิน | (D) ตัดจบ/เลื่อนซื้อ -> ปิดจบสุภาพสั้นๆ 1 บรรทัด ห้ามตื๊อขาย",
+                "- กฎเหล็ก #0 ประเมินสถานการณ์ก่อนตอบทุกครั้ง: (A) ลูกค้าสนใจซื้อ/ถามสินค้า -> ซอย 3 Enter สั้นคมไม่สาวความยาว + **เน้นถาม Hook ให้ลูกค้าตอบกลับมา** (ถามเอว/สะโพก หรือเปิดทางเลือก 'เอาโอนหรือปลายทางดีคะพี่') เร่งปิดการขายขั้นเทพ! | (B) ลูกค้าเก่าเคยซื้อแล้วทักซื้อเพิ่ม -> ใช้กฎ VIP ทวนไซส์เดิม+ที่อยู่เดิม+เปิด 2-3 ตัว+โอนหรือปลายทาง | (C) ฟีดแบค/ตำหนิ/แจ้งปัญหา/ตามของ/เลขพัสดุ/ขอเปลี่ยนไซส์ -> ห้ามขายของหรือเร่งปิดการขายเด็ดขาด! เลือก HANDOFF_ADMIN | (D) ตัดจบ/เลื่อนซื้อ -> เลือก SKIP_CLOSED ห้ามตามต่อ",
                 vip_returning_rule,
-                "- กฎเหล็ก #1 ซอย 3 Enter สั้นสุดๆ แบบคนพิมพ์แชทไวๆ (ห้ามประโยคยาวเด็ดขาด!): แต่ละ Enter ยาวแค่ 4–8 คำ (ไม่เกิน 28–32 ตัวอักษร) ห้ามจบอ่อนๆ แบบ 'เดี๋ยวหนูเช็กให้ค่ะ' หรือ 'รอให้บริการเสมอค่ะ'",
+                "- กฎเหล็ก #1 ซอย 3 Enter สั้นสุดๆ แบบเซียนแชทตัวจริง (ห้ามสาวความยาวเด็ดขาด!): แต่ละ Enter ยาวแค่ 4–8 คำ (ไม่เกิน 28–32 ตัวอักษร) จบด้วยคำถามสั้นคมให้ลูกค้าอยากตอบกลับ ห้ามจบอ่อนๆ แบบ 'เดี๋ยวหนูเช็กให้ค่ะ' หรือ 'รอให้บริการเสมอค่ะ'",
                 "- กฎเหล็ก #2 ห้ามใช้ '?' ในภาษาไทย และห้ามใช้คำโป๊ะบอท (สะดวก/ทางร้าน/ลองสวม/สบายใจ/มีบริการ/เกรดพรีเมียม/ขอบพระคุณ/รอให้บริการ/เนื้อผ้ายีนส์ยืดนิ่มฟอกแล้ว)",
                 "- กฎเหล็ก #3 ยึดราคาจากแชทแอดมินก่อนเสมอ 100%: ถ้าแอดมินเคยพิมพ์ราคาไว้ในแชทแล้ว (เช่น 1,090 / 1,140 / 990) ให้ยึดราคานั้นเป๊ะ ห้ามกลับไปบอก 1,290 เด็ดขาด! และ**ห้ามคิดเลขรวมยอดเงินโอน/สรุปยอดบิลเองเด็ดขาด** (เช่น สั่งหลายตัว/โปรไลฟ์/เสื้อ+กางเกง ห้ามพิมพ์ 'ยอดโอนรวม ... บาท' ถ้าแอดมินไม่ได้เป็นคนพิมพ์ยอดนั้นไว้! ให้บอกว่า 'รับทราบรายการค่ะ เดี๋ยวให้แอดมินสรุปยอดบิลให้เลยนะคะ')",
                 "- กฎเหล็ก #4 ตอบตามภาษาที่ลูกค้าพิมพ์ล่าสุด 100% (ไทย/อังกฤษ/พม่า/ลาว)",
@@ -1476,8 +1436,8 @@ def generate_3enter_reply(
             json_fmt = '{"action": "SEND|SKIP_CLOSED|HANDOFF_ADMIN", "reason": "เหตุผลสั้นๆ", "enter1": "...", "enter2": "...", "enter3": "...", "enter4": "..."}' if is_branch_4enter else '{"action": "SEND|SKIP_CLOSED|HANDOFF_ADMIN", "reason": "เหตุผลสั้นๆ", "enter1": "...", "enter2": "...", "enter3": "..."}'
 
             fact_hints = []
-            if facts_check.get("size_label"):
-                fact_hints.append(f"ไซส์ที่คำนวณได้แม่นยำ: {facts_check['size_label']} (ยึดไซส์นี้เป๊ะ)")
+            if facts_check.get("rec_size"):
+                fact_hints.append(f"ไซส์ที่คำนวณได้แม่นยำ: {facts_check['rec_size']} (ยึดไซส์นี้เป๊ะ ห้ามเดาไซส์อื่นทับ!)")
             if facts_check.get("waist_too_big"):
                 fact_hints.append(f"ลูกค้าเอว {facts_check.get('waist')} นิ้ว เกินไซส์ใหญ่สุดของร้าน (4XL เอว 38-42) ต้องแจ้งตรงๆ อย่างสุภาพว่าใหญ่สุดคือ 4XL")
             if facts_check.get("waist_too_small"):
