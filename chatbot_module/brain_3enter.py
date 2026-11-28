@@ -1290,7 +1290,14 @@ def generate_3enter_reply(
         _q = any(k in last_c_raw for k in ("?", "ไหม", "มั้ย", "เท่าไหร่", "เท่าไร", "เอว", "สะโพก", "ไซส์", "ราคา", "โอน", "ปลายทาง", "ที่อยู่", "เปลี่ยน", "ตำหนิ", "ผิด"))
         if not _q:
             if any(k in last_c_raw for k in ("ไว้ดู", "ดูก่อน", "ยังไม่สั่ง", "ยังไม่เอา", "ยังไม่รับ", "คิดดูก่อน", "ไว้ก่อน", "ไว้โอกาสหน้า", "เดี๋ยวแวะ", "ไว้แวะ", "ถามเฉย", "ดูเฉย")):
-                return ["ได้เลยค่ะพี่ ไม่เป็นไรนะคะ 🙏 ถ้าสนใจรุ่นไหนหรืออยากเช็กไซส์ ทักหนูได้ตลอดเลยค่ะ"]
+                already_polite_closed = any(
+                    m.get("sender_role") in ("bot", "admin")
+                    and any(ck in (m.get("text") or "") for ck in ("ไม่เป็นไร", "ทักหนูได้ตลอด", "พร้อมเมื่อไหร่ทัก"))
+                    for m in (messages or [])[-10:]
+                )
+                if already_polite_closed:
+                    return []
+                return ["ได้เลยค่ะพี่ ไม่เป็นไรเลยน้า พร้อมเมื่อไหร่ทักหนูได้เลยค่ะ"]
             if any(k in last_c_raw for k in ("ขอบคุณ", "ขอบพระคุณ", "รับทราบ", "โอเค", "เรียบร้อยแล้ว")):
                 return []
     # Post-order guard: never interrupt a JUST-closed order from human admin (within last 12h ONLY — never block returning VIPs from days/weeks ago!)
@@ -1493,7 +1500,7 @@ def generate_3enter_reply(
 
 สำคัญมาก — กฎวิจารณญาณ (AI Self-Gatekeeper) ก่อนตอบทุกครั้งให้เลือก action:
 - เลือก "SKIP_CLOSED" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าจบบทสนทนาแล้ว / บอกจะโอนพรุ่งนี้-เดี๋ยวทักกลับ-ขอเดินช็อปปิ้งก่อน / นัดวันเวลาเรียบร้อยแล้ว / แอดมินตอบครบแล้ว / หรือถ้าส่งข้อความตอนนี้จะดูจี้ซ้ำน่ารำคาญ
-- เลือก "HANDOFF_ADMIN" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าถามสเปกวัดจริงเฉพาะรุ่นที่ไม่มีข้อมูลแน่นอน / ถามว่า "มีกี่แบบ / มีแบบไหนบ้าง / ขอดูแบบ / ขอดูลาย" ที่ต้องให้แอดมินส่งรูปรุ่นจริงในสต็อก / เทียบหลายรุ่น / เคสละเอียดอ่อนที่แอดมินคนจริงควรตอบเอง (ห้ามเดามั่ว!)
+- เลือก "HANDOFF_ADMIN" (และปล่อย enter1-3 ว่าง) ทันที ถ้า: ลูกค้าถามสเปกวัดจริงเฉพาะรุ่นที่ไม่มีข้อมูลแน่นอน / ถามว่า "มีกี่แบบ / มีแบบไหนบ้าง / ขอดูแบบ / ขอดูลาย" ที่ต้องให้แอดมินส่งรูปรุ่นจริงในสต็อก / ต่อราคาหรือเทียบราคา TikTok-Shopee / เทียบหลายรุ่น / เคสละเอียดอ่อนที่แอดมินคนจริงควรตอบเอง (ห้ามเดามั่ว!)
 - เลือก "SEND" เฉพาะเมื่อมั่นใจ 100% ว่าตอบตรงบริบทจริง สั้นคมเหมือนคน และไม่ซ้ำซาก
 
 ตอบกลับเป็น JSON เท่านั้น: {json_fmt}"""
@@ -1587,7 +1594,16 @@ def generate_3enter_reply(
                                 else:
                                     b_line = "รับ 2 ตัวไว้สลับใส่ หรือจับคู่เสื้อเข้าเซ็ตไหมคะ มีโปรลดให้ค่ะ"
                             safe_bubbles.append(b_line)
-                        return _enforce_1line_human_bubbles(safe_bubbles, max_len=68, max_bubbles=4 if is_branch_4enter else 3)
+                        # Global anti-repeat guard: never repeat any bubble already sent by Page/Bot in last 8 messages!
+                        recent_page_8 = [
+                            (m.get("text") or "").strip()
+                            for m in (messages or [])[-8:]
+                            if m.get("sender_role") in ("bot", "admin") and (m.get("text") or "").strip()
+                        ]
+                        dedup_bubbles = [b_ln for b_ln in safe_bubbles if not _is_dup_bubble(b_ln, recent_page_8)]
+                        if not dedup_bubbles:
+                            return []
+                        return _enforce_1line_human_bubbles(dedup_bubbles, max_len=68, max_bubbles=4 if is_branch_4enter else 3)
                 except Exception as inner_e:
                     err_s = str(inner_e)
                     LAST_LLM_STATUS.update({"model": cand_model, "ok": False, "error": err_s[:180], "at": time.strftime("%H:%M:%S")})
